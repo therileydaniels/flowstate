@@ -1604,9 +1604,10 @@ function renderInbox() {
   let html = '';
 
   html += `<div class="input-bar">
-    <input type="text" id="inbox-input" placeholder="brain dump here..."
-      onkeydown="if(event.key==='Enter')inboxAdd()" />
-    <button class="btn-add" onclick="inboxAdd()">+</button>
+    <textarea id="inbox-input" rows="1" placeholder="add tasks... one per line"
+      oninput="autoGrow(this);updateAddButton('inbox-add-btn','inbox-input')"
+      onkeydown="handleTextareaKey(event,'inbox')"></textarea>
+    <button class="btn-add" id="inbox-add-btn" onclick="inboxAdd()">+</button>
   </div>`;
   html += `<div class="hint-text">type "idea:" to capture a thought</div>`;
 
@@ -1646,18 +1647,24 @@ function renderInbox() {
 }
 
 function inboxAdd() {
-  const input = document.getElementById('inbox-input');
-  if (!input || !input.value.trim()) return;
-  const parsed = parseEntry(input.value);
-  if (!parsed.name) return;
+  const textarea = document.getElementById('inbox-input');
+  if (!textarea || !textarea.value.trim()) return;
+  const lines = getLines(textarea);
+  if (lines.length === 0) return;
 
-  data.tasks.push({
-    id: genId(), name: parsed.name, zone: 'inbox',
-    energy: parsed.energy, priority: null,
-    time: parsed.time, status: null, kind: parsed.kind
+  lines.forEach(line => {
+    const parsed = parseEntry(line);
+    if (!parsed.name) return;
+    data.tasks.push({
+      id: genId(), name: parsed.name, zone: 'inbox',
+      energy: parsed.energy, priority: null,
+      time: parsed.time, status: null, kind: parsed.kind
+    });
   });
   save();
-  input.value = '';
+  textarea.value = '';
+  autoGrow(textarea);
+  updateAddButton('inbox-add-btn', 'inbox-input');
   render();
 }
 
