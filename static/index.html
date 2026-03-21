@@ -860,6 +860,130 @@
       margin-top: 8px;
     }
     .btn-new-template:active { background: var(--bg); }
+    .tpl-edit-section { margin-bottom: 16px; }
+    .tpl-edit-label {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: lowercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .tpl-icon-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+    .tpl-icon-cell {
+      width: 44px;
+      height: 44px;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      background: var(--bg);
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tpl-icon-cell.selected { border-color: var(--cta); background: var(--bg2); }
+    .tpl-icon-cell:active { background: var(--bg2); }
+    .tpl-task-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tpl-task-row .card-name { flex: 1; font-size: 14px; }
+    .tpl-task-time {
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: var(--bg);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border: none;
+      font-family: 'Quicksand', sans-serif;
+    }
+    .tpl-task-time:active { background: var(--bg2); }
+    .tpl-task-remove {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tpl-task-remove:active { background: var(--bg); }
+    .tpl-task-remove.confirming {
+      background: #C75450;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .tpl-add-task-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .tpl-add-task-row input {
+      flex: 1;
+      height: 40px;
+      padding: 0 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+    }
+    .tpl-add-task-row input:focus {
+      box-shadow: 0 0 0 3px rgba(94,91,174,0.15);
+    }
+    .tpl-add-task-row button {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      border: none;
+      border-radius: 10px;
+      background: var(--cta);
+      color: white;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-delete-template {
+      width: 100%;
+      height: 44px;
+      border: none;
+      background: transparent;
+      color: #C75450;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 16px;
+      border-radius: 12px;
+    }
+    .btn-delete-template:active { background: #FDF0EF; }
+    .btn-delete-template.confirming {
+      background: #C75450;
+      color: white;
+    }
+    .tpl-edit-error {
+      color: #C75450;
+      font-size: 13px;
+      margin-top: 4px;
+    }
     .template-tasks {
       margin-top: 12px;
       padding-top: 12px;
@@ -1182,6 +1306,7 @@ function esc(str) {
 let currentTab = 'today';
 let deleteState = { taskId: null, timeout: null };
 let sheetState = {};
+let tplEditState = { id: null, icon: '📋', name: '', energy: 'steady', tasks: [] };
 let wsidState = { energy: null, time: null, pickOne: false, pickIndex: 0, skipped: new Set() };
 let doneFilter = null;
 
@@ -1432,6 +1557,183 @@ function loadTemplate(id) {
   save();
   closeSheet();
   switchTab('today');
+}
+
+const TPL_ICONS = ['📬','🎬','📋','✂️','🗓','📤','📦','🎨','💪','🧹','🛒','💻','🎵','📸','🏠','💰'];
+const TIME_OPTS = ['15m','30m','1hr','2hr+'];
+
+function openTemplateEdit(id) {
+  if (id) {
+    const tpl = data.templates.find(t => t.id === id);
+    if (!tpl) return;
+    tplEditState = {
+      id: tpl.id,
+      icon: tpl.icon,
+      name: tpl.name,
+      energy: tpl.energy,
+      tasks: tpl.tasks.map(t => ({ name: t.name, time: t.time }))
+    };
+  } else {
+    tplEditState = { id: null, icon: '📋', name: '', energy: 'steady', tasks: [] };
+  }
+  renderTemplateEdit();
+}
+
+function renderTemplateEdit() {
+  sheetState = { mode: 'template-edit' };
+  let html = `<div class="sheet-title">${tplEditState.id ? 'edit template' : 'new template'}</div>`;
+
+  // Icon picker
+  html += '<div class="tpl-edit-section">';
+  html += '<div class="tpl-edit-label">icon</div>';
+  html += '<div class="tpl-icon-grid">';
+  TPL_ICONS.forEach(icon => {
+    html += `<button class="tpl-icon-cell ${tplEditState.icon === icon ? 'selected' : ''}"
+      onclick="tplEditState.icon='${icon}';renderTemplateEdit()">${icon}</button>`;
+  });
+  html += '</div></div>';
+
+  // Name
+  html += '<div class="tpl-edit-section">';
+  html += '<div class="tpl-edit-label">name</div>';
+  html += `<input type="text" id="tpl-name-input" value="${esc(tplEditState.name)}"
+    placeholder="template name..." style="width:100%;height:44px;padding:0 12px;
+    border:1.5px solid var(--border);border-radius:12px;background:var(--card);
+    font-family:Quicksand,sans-serif;font-size:15px;color:var(--text);outline:none"
+    oninput="tplEditState.name=this.value" />`;
+  html += '</div>';
+
+  // Energy
+  html += '<div class="tpl-edit-section">';
+  html += '<div class="tpl-edit-label">energy</div>';
+  html += '<div class="picker-row">';
+  [{ val: 'deep', label: '🔴 deep' }, { val: 'steady', label: '🟡 steady' }, { val: 'easy', label: '🟢 easy' }].forEach(o => {
+    html += `<button class="picker-chip energy-${o.val} ${tplEditState.energy === o.val ? 'selected' : ''}"
+      onclick="tplEditState.energy='${o.val}';renderTemplateEdit()">${o.label}</button>`;
+  });
+  html += '</div></div>';
+
+  // Tasks
+  html += '<div class="tpl-edit-section">';
+  html += `<div class="tpl-edit-label">tasks (${tplEditState.tasks.length})</div>`;
+  tplEditState.tasks.forEach((t, i) => {
+    html += `<div class="tpl-task-row">
+      <span class="card-name">${esc(t.name)}</span>
+      <button class="tpl-task-time" onclick="cycleTplTaskTime(${i})">${t.time}</button>
+      <button class="tpl-task-remove" id="tpl-rm-${i}" onclick="removeTplTask(${i})">&times;</button>
+    </div>`;
+  });
+  html += `<div class="tpl-add-task-row">
+    <input type="text" id="tpl-task-input" placeholder="task name..."
+      onkeydown="if(event.key==='Enter'){event.preventDefault();addTplTask()}" />
+    <button onclick="addTplTask()">+</button>
+  </div>`;
+  html += '</div>';
+
+  // Actions
+  html += '<div class="sheet-actions">';
+  html += '<button class="sheet-btn-secondary" onclick="openTemplateTray()">cancel</button>';
+  html += '<button class="sheet-btn-primary" onclick="saveTemplate()">save</button>';
+  html += '</div>';
+
+  if (tplEditState.id) {
+    html += `<button class="btn-delete-template" id="tpl-delete-btn"
+      onclick="confirmDeleteTemplate()">delete template</button>`;
+  }
+
+  html += '<div id="tpl-edit-errors"></div>';
+  openSheet(html);
+}
+
+function addTplTask() {
+  const input = document.getElementById('tpl-task-input');
+  if (!input || !input.value.trim()) return;
+  tplEditState.tasks.push({ name: input.value.trim(), time: '30m' });
+  renderTemplateEdit();
+  setTimeout(() => {
+    const newInput = document.getElementById('tpl-task-input');
+    if (newInput) newInput.focus();
+  }, 50);
+}
+
+function removeTplTask(index) {
+  const btn = document.getElementById('tpl-rm-' + index);
+  if (!btn) return;
+  if (btn.classList.contains('confirming')) {
+    tplEditState.tasks.splice(index, 1);
+    renderTemplateEdit();
+  } else {
+    btn.classList.add('confirming');
+    btn.textContent = 'sure?';
+    setTimeout(() => {
+      if (btn.parentElement) {
+        btn.classList.remove('confirming');
+        btn.textContent = '\u00d7';
+      }
+    }, 2500);
+  }
+}
+
+function cycleTplTaskTime(index) {
+  const t = tplEditState.tasks[index];
+  const ci = TIME_OPTS.indexOf(t.time);
+  t.time = TIME_OPTS[(ci + 1) % TIME_OPTS.length];
+  renderTemplateEdit();
+}
+
+function saveTemplate() {
+  const nameInput = document.getElementById('tpl-name-input');
+  if (nameInput) tplEditState.name = nameInput.value.trim();
+
+  const errors = [];
+  if (!tplEditState.name) errors.push('give it a name...');
+  if (tplEditState.tasks.length === 0) errors.push('add at least one task...');
+
+  if (errors.length) {
+    const errEl = document.getElementById('tpl-edit-errors');
+    if (errEl) errEl.innerHTML = errors.map(e => `<div class="tpl-edit-error">${e}</div>`).join('');
+    return;
+  }
+
+  if (tplEditState.id) {
+    const tpl = data.templates.find(t => t.id === tplEditState.id);
+    if (tpl) {
+      tpl.icon = tplEditState.icon;
+      tpl.name = tplEditState.name;
+      tpl.energy = tplEditState.energy;
+      tpl.tasks = tplEditState.tasks.map(t => ({ name: t.name, time: t.time }));
+    }
+  } else {
+    data.templates.push({
+      id: genId(),
+      icon: tplEditState.icon,
+      name: tplEditState.name,
+      energy: tplEditState.energy,
+      tasks: tplEditState.tasks.map(t => ({ name: t.name, time: t.time }))
+    });
+  }
+
+  save();
+  openTemplateTray();
+}
+
+function confirmDeleteTemplate() {
+  const btn = document.getElementById('tpl-delete-btn');
+  if (!btn) return;
+  if (btn.classList.contains('confirming')) {
+    data.templates = data.templates.filter(t => t.id !== tplEditState.id);
+    save();
+    openTemplateTray();
+  } else {
+    btn.classList.add('confirming');
+    btn.textContent = 'sure? delete';
+    setTimeout(() => {
+      if (btn.parentElement) {
+        btn.classList.remove('confirming');
+        btn.textContent = 'delete template';
+      }
+    }, 2500);
+  }
 }
 
 // ═══════════════════════════════════════
