@@ -126,13 +126,6 @@
     .input-bar textarea::placeholder {
       color: var(--accent);
     }
-    .btn-add {
-      min-width: 48px;
-      width: auto;
-      padding: 0 12px;
-      white-space: nowrap;
-      font-size: 16px;
-    }
     .btn-add, .btn-template {
       width: 48px;
       height: 48px;
@@ -160,6 +153,13 @@
     }
     .btn-template:active {
       background: var(--border);
+    }
+    .btn-add {
+      min-width: 48px;
+      width: auto;
+      padding: 0 12px;
+      white-space: nowrap;
+      font-size: 16px;
     }
 
     /* ═══ PICKER CHIPS ═══ */
@@ -1350,7 +1350,8 @@ function reopenCurrentSheet() {
   else if (sheetState.mode === 'edit') openEditSheet(sheetState.taskId);
   else if (sheetState.mode === 'note') openNoteSheet(sheetState.taskId, sheetState.placementId);
   else if (sheetState.mode === 'template-list') openTemplateTray();
-  else if (sheetState.mode === 'template-preview') openTemplatePreview(sheetState.templateIndex);
+  else if (sheetState.mode === 'template-preview') openTemplatePreview(sheetState.templateId);
+  else if (sheetState.mode === 'template-edit') renderTemplateEdit();
 }
 
 // ═══════════════════════════════════════
@@ -1580,6 +1581,8 @@ function openTemplateEdit(id) {
 }
 
 function renderTemplateEdit() {
+  const nameEl = document.getElementById('tpl-name-input');
+  if (nameEl) tplEditState.name = nameEl.value;
   sheetState = { mode: 'template-edit' };
   let html = `<div class="sheet-title">${tplEditState.id ? 'edit template' : 'new template'}</div>`;
 
@@ -1630,6 +1633,8 @@ function renderTemplateEdit() {
   </div>`;
   html += '</div>';
 
+  html += '<div id="tpl-edit-errors"></div>';
+
   // Actions
   html += '<div class="sheet-actions">';
   html += '<button class="sheet-btn-secondary" onclick="openTemplateTray()">cancel</button>';
@@ -1640,8 +1645,6 @@ function renderTemplateEdit() {
     html += `<button class="btn-delete-template" id="tpl-delete-btn"
       onclick="confirmDeleteTemplate()">delete template</button>`;
   }
-
-  html += '<div id="tpl-edit-errors"></div>';
   openSheet(html);
 }
 
