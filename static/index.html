@@ -1687,9 +1687,10 @@ function renderPile() {
   let html = '';
 
   html += `<div class="input-bar">
-    <input type="text" id="pile-input" placeholder="add a recurring task..."
-      onkeydown="if(event.key==='Enter')pileAdd()" />
-    <button class="btn-add" onclick="pileAdd()">+</button>
+    <textarea id="pile-input" rows="1" placeholder="add recurring tasks... one per line"
+      oninput="autoGrow(this);updateAddButton('pile-add-btn','pile-input')"
+      onkeydown="handleTextareaKey(event,'pile')"></textarea>
+    <button class="btn-add" id="pile-add-btn" onclick="pileAdd()">+</button>
   </div>`;
 
   // Pickers
@@ -1745,20 +1746,26 @@ function renderPile() {
 }
 
 function pileAdd() {
-  const input = document.getElementById('pile-input');
-  if (!input || !input.value.trim()) return;
-  const parsed = parseEntry(input.value);
-  if (!parsed.name) return;
+  const textarea = document.getElementById('pile-input');
+  if (!textarea || !textarea.value.trim()) return;
+  const lines = getLines(textarea);
+  if (lines.length === 0) return;
 
-  data.tasks.push({
-    id: genId(), name: parsed.name, zone: 'pile',
-    energy: parsed.energy || pileInput.energy,
-    priority: pileInput.priority || 'important',
-    time: parsed.time || pileInput.time,
-    status: 'available', kind: 'task'
+  lines.forEach(line => {
+    const parsed = parseEntry(line);
+    if (!parsed.name) return;
+    data.tasks.push({
+      id: genId(), name: parsed.name, zone: 'pile',
+      energy: parsed.energy || pileInput.energy,
+      priority: pileInput.priority || 'important',
+      time: parsed.time || pileInput.time,
+      status: 'available', kind: 'task'
+    });
   });
   save();
-  input.value = '';
+  textarea.value = '';
+  autoGrow(textarea);
+  updateAddButton('pile-add-btn', 'pile-input');
   render();
 }
 
