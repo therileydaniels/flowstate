@@ -1074,6 +1074,43 @@ function parseEntry(text) {
   return { name, energy, time, kind };
 }
 
+function autoGrow(textarea) {
+  textarea.style.height = '48px';
+  if (textarea.scrollHeight > 48) {
+    textarea.style.height = Math.min(textarea.scrollHeight, 180) + 'px';
+    textarea.style.overflow = textarea.scrollHeight > 180 ? 'auto' : 'hidden';
+  }
+}
+
+function getLines(textarea) {
+  if (!textarea) return [];
+  return textarea.value.split('\n').filter(line => line.trim() !== '');
+}
+
+function updateAddButton(btnId, textareaId) {
+  const btn = document.getElementById(btnId);
+  const textarea = document.getElementById(textareaId);
+  if (!btn || !textarea) return;
+  const lines = getLines(textarea);
+  if (lines.length > 1) {
+    btn.textContent = 'add ' + lines.length;
+  } else {
+    btn.textContent = '+';
+  }
+}
+
+function handleTextareaKey(event, zone) {
+  if (event.key !== 'Enter') return;
+  const textarea = event.target;
+  const lines = getLines(textarea);
+  if (lines.length <= 1 && !event.shiftKey) {
+    event.preventDefault();
+    if (zone === 'inbox') inboxAdd();
+    else if (zone === 'pile') pileAdd();
+    else if (zone === 'backlog') backlogAdd();
+  }
+}
+
 // ═══════════════════════════════════════
 // RENDER HELPERS
 // ═══════════════════════════════════════
