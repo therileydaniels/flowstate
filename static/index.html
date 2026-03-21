@@ -1804,9 +1804,10 @@ function renderBacklog() {
   let html = '';
 
   html += `<div class="input-bar">
-    <input type="text" id="backlog-input" placeholder="add a task..."
-      onkeydown="if(event.key==='Enter')backlogAdd()" />
-    <button class="btn-add" onclick="backlogAdd()">+</button>
+    <textarea id="backlog-input" rows="1" placeholder="add tasks... one per line"
+      oninput="autoGrow(this);updateAddButton('backlog-add-btn','backlog-input')"
+      onkeydown="handleTextareaKey(event,'backlog')"></textarea>
+    <button class="btn-add" id="backlog-add-btn" onclick="backlogAdd()">+</button>
   </div>`;
 
   const energyOpts = [
@@ -1863,20 +1864,26 @@ function renderBacklog() {
 }
 
 function backlogAdd() {
-  const input = document.getElementById('backlog-input');
-  if (!input || !input.value.trim()) return;
-  const parsed = parseEntry(input.value);
-  if (!parsed.name) return;
+  const textarea = document.getElementById('backlog-input');
+  if (!textarea || !textarea.value.trim()) return;
+  const lines = getLines(textarea);
+  if (lines.length === 0) return;
 
-  data.tasks.push({
-    id: genId(), name: parsed.name, zone: 'backlog',
-    energy: parsed.energy || backlogInput.energy,
-    priority: backlogInput.priority || 'important',
-    time: parsed.time || backlogInput.time,
-    status: null, kind: 'task'
+  lines.forEach(line => {
+    const parsed = parseEntry(line);
+    if (!parsed.name) return;
+    data.tasks.push({
+      id: genId(), name: parsed.name, zone: 'backlog',
+      energy: parsed.energy || backlogInput.energy,
+      priority: backlogInput.priority || 'important',
+      time: parsed.time || backlogInput.time,
+      status: null, kind: 'task'
+    });
   });
   save();
-  input.value = '';
+  textarea.value = '';
+  autoGrow(textarea);
+  updateAddButton('backlog-add-btn', 'backlog-input');
   render();
 }
 
