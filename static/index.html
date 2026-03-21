@@ -828,6 +828,38 @@
       font-size: 12px;
       color: var(--text-muted);
     }
+    .template-card { position: relative; }
+    .template-edit-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      background: var(--bg);
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .template-edit-btn:active { background: var(--bg2); }
+    .btn-new-template {
+      width: 100%;
+      height: 48px;
+      border: 1.5px dashed var(--border);
+      border-radius: 16px;
+      background: transparent;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-new-template:active { background: var(--bg); }
     .template-tasks {
       margin-top: 12px;
       padding-top: 12px;
@@ -1344,9 +1376,15 @@ function skipNote() {
 // ═══════════════════════════════════════
 function openTemplateTray() {
   sheetState = { mode: 'template-list' };
-  let html = `<div class="sheet-title">templates</div>`;
-  TEMPLATES.forEach((tpl, i) => {
-    html += `<div class="template-card" onclick="openTemplatePreview(${i})">
+  let html = '<div class="sheet-title">templates</div>';
+
+  if (data.templates.length === 0) {
+    html += '<div class="empty-state">no templates yet... create one to get started</div>';
+  }
+
+  data.templates.forEach(tpl => {
+    html += `<div class="template-card" onclick="openTemplatePreview('${tpl.id}')">
+      <button class="template-edit-btn" onclick="event.stopPropagation();openTemplateEdit('${tpl.id}')">✏️</button>
       <div class="template-header">
         <span class="template-icon">${tpl.icon}</span>
         <span class="template-name">${esc(tpl.name)}</span>
@@ -1355,27 +1393,32 @@ function openTemplateTray() {
       </div>
     </div>`;
   });
+
+  html += '<button class="btn-new-template" onclick="openTemplateEdit(null)">+ new template</button>';
   openSheet(html);
 }
 
-function openTemplatePreview(index) {
-  sheetState = { mode: 'template-preview', templateIndex: index };
-  const tpl = TEMPLATES[index];
+function openTemplatePreview(id) {
+  const tpl = data.templates.find(t => t.id === id);
+  if (!tpl) return;
+  sheetState = { mode: 'template-preview', templateId: id };
   let html = `<div class="sheet-title">${tpl.icon} ${esc(tpl.name)}</div>`;
-  html += `<div class="template-tasks">`;
+  html += '<div class="template-tasks">';
   tpl.tasks.forEach(t => {
     html += `<div class="template-task-item">${esc(t.name)} ${energyChip(tpl.energy)} ${timeChip(t.time)}</div>`;
   });
-  html += `</div>`;
+  html += '</div>';
   html += `<div class="sheet-actions">
     <button class="sheet-btn-secondary" onclick="openTemplateTray()">back</button>
-    <button class="sheet-btn-primary" onclick="loadTemplate(${index})">load onto today</button>
+    <button class="sheet-btn-secondary" onclick="openTemplateEdit('${id}')">edit</button>
+    <button class="sheet-btn-primary" onclick="loadTemplate('${id}')">load onto today</button>
   </div>`;
   openSheet(html);
 }
 
-function loadTemplate(index) {
-  const tpl = TEMPLATES[index];
+function loadTemplate(id) {
+  const tpl = data.templates.find(t => t.id === id);
+  if (!tpl) return;
   const today = todayStr();
   tpl.tasks.forEach(t => {
     const task = {
