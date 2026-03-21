@@ -907,7 +907,12 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const d = JSON.parse(raw);
-      if (d && d.tasks) return d;
+      if (d && d.tasks) {
+        if (d.templates === undefined) {
+          d.templates = seedTemplates();
+        }
+        return d;
+      }
     }
   } catch(e) {}
   return seed();
@@ -931,7 +936,8 @@ function seed() {
       { id: genId(), name: 'collab with another creator for cross-promo', zone: 'inbox', energy: null, priority: null, time: null, status: null, kind: 'idea' },
     ],
     placements: [],
-    completions: []
+    completions: [],
+    templates: seedTemplates()
   };
 }
 
@@ -940,68 +946,70 @@ let data = load();
 // ═══════════════════════════════════════
 // TEMPLATES
 // ═══════════════════════════════════════
-const TEMPLATES = [
-  {
-    name: 'Tuesday Fulfillment', icon: '📬', energy: 'steady',
-    tasks: [
-      { name: 'send game DMs + prizes', time: '30m' },
-      { name: 'apply sub extensions', time: '15m' },
-      { name: 'message top 3 spenders', time: '15m' },
-      { name: 'post scheduled content', time: '15m' },
-      { name: 'send weekly mass DM', time: '15m' },
-      { name: 'collect name moan signups', time: '15m' }
-    ]
-  },
-  {
-    name: 'Filming Day', icon: '🎬', energy: 'deep',
-    tasks: [
-      { name: 'review shot list + outfits', time: '30m' },
-      { name: 'set up lighting + camera', time: '30m' },
-      { name: 'film personalized items', time: '1hr' },
-      { name: 'film custom orders', time: '1hr' },
-      { name: 'film scheduled videos', time: '2hr+' },
-      { name: 'backup footage to NAS', time: '15m' }
-    ]
-  },
-  {
-    name: 'Admin Hour', icon: '📋', energy: 'easy',
-    tasks: [
-      { name: 'respond to DMs', time: '15m' },
-      { name: 'check platform notifications', time: '15m' },
-      { name: 'update tracking spreadsheets', time: '15m' },
-      { name: 'organize Dropbox folders', time: '15m' }
-    ]
-  },
-  {
-    name: 'Edit Session', icon: '✂️', energy: 'deep',
-    tasks: [
-      { name: 'edit + watermark videos', time: '1hr' },
-      { name: 'cut teaser clips for tube sites', time: '30m' },
-      { name: 'add outro cards', time: '15m' },
-      { name: 'export + organize by platform', time: '30m' }
-    ]
-  },
-  {
-    name: 'Content Planning', icon: '🗓', energy: 'deep',
-    tasks: [
-      { name: 'review last month\'s game performance', time: '30m' },
-      { name: 'plan this month\'s tip games', time: '30m' },
-      { name: 'plan live stream schedule', time: '30m' },
-      { name: 'update content calendar', time: '30m' },
-      { name: 'plan filming batch for next month', time: '30m' }
-    ]
-  },
-  {
-    name: 'Upload Day', icon: '📤', energy: 'steady',
-    tasks: [
-      { name: 'upload to ManyVids + write descriptions', time: '30m' },
-      { name: 'upload to Clips4Sale + tag', time: '30m' },
-      { name: 'schedule OF VIP post', time: '15m' },
-      { name: 'schedule OF Free posts', time: '15m' },
-      { name: 'upload teasers to tube sites', time: '30m' }
-    ]
-  }
-];
+function seedTemplates() {
+  return [
+    {
+      id: genId(), name: 'Tuesday Fulfillment', icon: '📬', energy: 'steady',
+      tasks: [
+        { name: 'send game DMs + prizes', time: '30m' },
+        { name: 'apply sub extensions', time: '15m' },
+        { name: 'message top 3 spenders', time: '15m' },
+        { name: 'post scheduled content', time: '15m' },
+        { name: 'send weekly mass DM', time: '15m' },
+        { name: 'collect name moan signups', time: '15m' }
+      ]
+    },
+    {
+      id: genId(), name: 'Filming Day', icon: '🎬', energy: 'deep',
+      tasks: [
+        { name: 'review shot list + outfits', time: '30m' },
+        { name: 'set up lighting + camera', time: '30m' },
+        { name: 'film personalized items', time: '1hr' },
+        { name: 'film custom orders', time: '1hr' },
+        { name: 'film scheduled videos', time: '2hr+' },
+        { name: 'backup footage to NAS', time: '15m' }
+      ]
+    },
+    {
+      id: genId(), name: 'Admin Hour', icon: '📋', energy: 'easy',
+      tasks: [
+        { name: 'respond to DMs', time: '15m' },
+        { name: 'check platform notifications', time: '15m' },
+        { name: 'update tracking spreadsheets', time: '15m' },
+        { name: 'organize Dropbox folders', time: '15m' }
+      ]
+    },
+    {
+      id: genId(), name: 'Edit Session', icon: '✂️', energy: 'deep',
+      tasks: [
+        { name: 'edit + watermark videos', time: '1hr' },
+        { name: 'cut teaser clips for tube sites', time: '30m' },
+        { name: 'add outro cards', time: '15m' },
+        { name: 'export + organize by platform', time: '30m' }
+      ]
+    },
+    {
+      id: genId(), name: 'Content Planning', icon: '🗓', energy: 'deep',
+      tasks: [
+        { name: 'review last month\'s game performance', time: '30m' },
+        { name: 'plan this month\'s tip games', time: '30m' },
+        { name: 'plan live stream schedule', time: '30m' },
+        { name: 'update content calendar', time: '30m' },
+        { name: 'plan filming batch for next month', time: '30m' }
+      ]
+    },
+    {
+      id: genId(), name: 'Upload Day', icon: '📤', energy: 'steady',
+      tasks: [
+        { name: 'upload to ManyVids + write descriptions', time: '30m' },
+        { name: 'upload to Clips4Sale + tag', time: '30m' },
+        { name: 'schedule OF VIP post', time: '15m' },
+        { name: 'schedule OF Free posts', time: '15m' },
+        { name: 'upload teasers to tube sites', time: '30m' }
+      ]
+    }
+  ];
+}
 
 // ═══════════════════════════════════════
 // DATE UTILITIES
