@@ -1,0 +1,2574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>FlowState</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600&family=Pacifico&family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/gh/pocketbase/js-sdk@master/dist/pocketbase.umd.js"></script>
+  <style>
+    /* === RESET + VARIABLES === */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F0EEFC;
+      --bg2: #E0DCF8;
+      --cta: #5E5BAE;
+      --cta-hover: #4E4A9A;
+      --accent: #A8A6D8;
+      --success: #8AAEAA;
+      --text: #2A2850;
+      --text-muted: #6A68A0;
+      --border: #C8C4EC;
+      --card: #FFFFFF;
+      --shadow: rgba(94,91,174,0.08);
+      --focus: rgba(94,91,174,0.15);
+    }
+    html.dark {
+      --bg: #1a1832;
+      --bg2: #2a2850;
+      --cta: #7B78C8;
+      --cta-hover: #9390D8;
+      --accent: #A8A6D8;
+      --success: #6A9E8A;
+      --text: #FFFFFF;
+      --text-muted: #A8A6D8;
+      --border: #3a3868;
+      --card: #2a2850;
+      --shadow: rgba(94,91,174,0.2);
+      --focus: rgba(94,91,174,0.3);
+    }
+
+    /* === BASE === */
+    body {
+      font-family: 'Quicksand', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #app {
+      max-width: 520px;
+      margin: 0 auto;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* === LOADING === */
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 18px;
+      color: var(--text-muted);
+    }
+    #app-content { display: none; flex-direction: column; flex: 1; }
+    #app-content.loaded { display: flex; }
+
+    /* === HEADER === */
+    header {
+      flex-shrink: 0;
+      padding: 16px 16px 4px;
+      text-align: center;
+      position: relative;
+    }
+    header h1 {
+      font-family: 'Pacifico', cursive;
+      font-size: 26px;
+      font-weight: 400;
+      color: var(--cta);
+      letter-spacing: 0.5px;
+    }
+    .theme-toggle {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 12px;
+      background: var(--bg2);
+      color: var(--text);
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .theme-toggle:active { background: var(--border); }
+    .streak-counter {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* === MAIN CONTENT === */
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 16px 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* === SECTION LABELS === */
+    .section-label {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-muted);
+      text-transform: lowercase;
+      letter-spacing: 0.5px;
+      margin: 24px 0 8px;
+    }
+
+    /* === INPUT BARS === */
+    .input-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .input-bar input[type="text"] {
+      flex: 1;
+      height: 48px;
+      padding: 0 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 15px;
+      color: var(--text);
+      outline: none;
+      transition: box-shadow 0.2s;
+    }
+    .input-bar input[type="text"]:focus {
+      box-shadow: 0 0 0 3px var(--focus);
+    }
+    .input-bar input[type="text"]::placeholder {
+      color: var(--accent);
+    }
+    .input-bar textarea {
+      flex: 1;
+      min-height: 48px;
+      max-height: 180px;
+      padding: 12px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 15px;
+      color: var(--text);
+      outline: none;
+      transition: box-shadow 0.2s;
+      resize: none;
+      overflow: hidden;
+      line-height: 1.5;
+    }
+    .input-bar textarea:focus {
+      box-shadow: 0 0 0 3px var(--focus);
+    }
+    .input-bar textarea::placeholder {
+      color: var(--accent);
+    }
+    .btn-add, .btn-template {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      border: none;
+      border-radius: 8px;
+      background: var(--cta);
+      color: white;
+      font-family: 'Quicksand', sans-serif;
+      font-weight: 600;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    html.dark .btn-add {
+      box-shadow: 0 0 20px rgba(94,91,174,0.4);
+    }
+    .btn-add:active, .btn-template:active {
+      background: var(--cta-hover);
+    }
+    .btn-template {
+      background: var(--bg2);
+      color: var(--cta);
+      font-size: 18px;
+    }
+    .btn-template:active {
+      background: var(--border);
+    }
+    .btn-add {
+      min-width: 48px;
+      width: auto;
+      padding: 0 12px;
+      white-space: nowrap;
+      font-size: 16px;
+    }
+
+    /* === PICKER CHIPS === */
+    .picker-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .picker-chip {
+      height: 36px;
+      padding: 0 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .picker-chip.selected {
+      background: var(--cta);
+      color: white;
+      border-color: var(--cta);
+    }
+    .picker-chip.energy-deep.selected { background: #C75450; border-color: #C75450; }
+    .picker-chip.energy-steady.selected { background: #C49A2A; border-color: #C49A2A; }
+    .picker-chip.energy-easy.selected { background: #5A9E6F; border-color: #5A9E6F; }
+
+    /* === PROGRESS BAR === */
+    .progress-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding: 0 4px;
+    }
+    .progress-label {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .progress-label.complete { color: var(--success); }
+    .progress-track {
+      flex: 1;
+      height: 8px;
+      background: var(--bg2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--cta);
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+    .progress-fill.complete { background: var(--success); }
+
+    /* === CARDS === */
+    .task-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 2px 12px var(--shadow);
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: fadeUp 0.25s ease-out;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .task-card:active { transform: scale(0.98); }
+    .task-card.done-card {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .task-card.done-card .card-name { text-decoration: line-through; }
+    .task-card.idea-card {
+      border-style: dashed;
+      border-width: 2px;
+    }
+    .task-card.idea-card .card-name {
+      font-style: italic;
+    }
+    .card-checkbox {
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      border: 2.5px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 14px;
+    }
+    .card-checkbox.energy-deep { border-color: #C75450; }
+    .card-checkbox.energy-steady { border-color: #C49A2A; }
+    .card-checkbox.energy-easy { border-color: #5A9E6F; }
+    .card-checkbox.checked {
+      background: var(--success);
+      border-color: var(--success);
+      color: white;
+    }
+    .card-body {
+      flex: 1;
+      min-width: 0;
+    }
+    .card-name {
+      font-weight: 500;
+      font-size: 15px;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    /* === CHIPS === */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .chip-deep { color: #C75450; background: #FDF0EF; }
+    .chip-steady { color: #C49A2A; background: #FDF8EC; }
+    .chip-easy { color: #5A9E6F; background: #EFF8F2; }
+    .chip-time {
+      color: var(--text-muted);
+      background: var(--bg2);
+    }
+    .chip-priority {
+      color: var(--cta);
+      background: rgba(94,91,174,0.1);
+    }
+
+    /* === CARD ACTIONS === */
+    .card-actions {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .card-action {
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      font-family: 'Quicksand', sans-serif;
+      font-weight: 600;
+    }
+    .card-action:active { background: var(--bg2); }
+    .card-action.schedule-btn {
+      color: var(--cta);
+      font-size: 12px;
+    }
+    .card-action.evolve-btn {
+      color: var(--cta);
+      font-size: 12px;
+      width: auto;
+      padding: 0 10px;
+      background: rgba(94,91,174,0.08);
+      border-radius: 8px;
+    }
+    .card-action.delete-confirm {
+      background: #C75450;
+      color: white;
+      font-size: 11px;
+      width: auto;
+      padding: 0 10px;
+      border-radius: 8px;
+    }
+
+    /* === HABIT DOTS === */
+    .habit-dots {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .habit-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--bg2);
+    }
+    .habit-dot.filled { background: var(--success); }
+
+    /* === EMPTY STATE === */
+    .empty-state {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 48px 24px;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* === END OF DAY SUMMARY === */
+    .eod-summary {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 24px 16px;
+      font-size: 14px;
+      background: var(--bg2);
+      border-radius: 16px;
+      margin-top: 16px;
+    }
+
+    /* === DONE VIEW === */
+    .done-entry {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      animation: fadeUp 0.2s ease-out;
+    }
+    .done-entry:last-child { border-bottom: none; }
+    .done-entry-name {
+      font-weight: 500;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+    .done-entry-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .done-entry-note {
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .done-entry-time {
+      font-size: 12px;
+      color: var(--accent);
+    }
+    .date-header {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text);
+      margin: 24px 0 8px;
+      padding-bottom: 4px;
+    }
+    .date-header:first-child { margin-top: 8px; }
+
+    /* === FILTER ROW === */
+    .filter-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .filter-chip {
+      height: 36px;
+      padding: 0 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-chip.active {
+      background: var(--cta);
+      color: white;
+      border-color: var(--cta);
+    }
+
+    /* === TAB NAVIGATION === */
+    #tab-nav {
+      flex-shrink: 0;
+      display: flex;
+      overflow-x: auto;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 8px 4px;
+      gap: 2px;
+      position: relative;
+      scrollbar-width: none;
+    }
+    #tab-nav::-webkit-scrollbar { display: none; }
+    #tab-nav::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 24px;
+      background: linear-gradient(to right, transparent, var(--card));
+      pointer-events: none;
+      z-index: 2;
+    }
+    .tab-btn {
+      flex: 1;
+      min-width: 64px;
+      height: 48px;
+      border: none;
+      border-radius: 12px;
+      background: transparent;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .tab-btn .tab-icon { font-size: 18px; }
+    .tab-btn.active {
+      color: var(--cta);
+      background: rgba(94,91,174,0.08);
+    }
+
+    /* === WSID FAB === */
+    #wsid-fab {
+      position: fixed;
+      bottom: 80px;
+      right: max(16px, calc((100vw - 520px) / 2 + 16px));
+      width: 56px;
+      height: 56px;
+      border: none;
+      border-radius: 50%;
+      background: var(--cta);
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px var(--shadow);
+      z-index: 10;
+      animation: pulse 3s ease-in-out infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    html.dark #wsid-fab {
+      box-shadow: 0 0 20px rgba(94,91,174,0.4);
+    }
+    #wsid-fab:active { transform: scale(0.92); animation: none; }
+
+    /* === WSID PANEL === */
+    #wsid-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: var(--bg);
+      display: none;
+      flex-direction: column;
+    }
+    #wsid-panel.open { display: flex; }
+    .wsid-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      max-width: 520px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .wsid-title {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 600;
+      font-size: 20px;
+      color: var(--text);
+    }
+    .wsid-close {
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 12px;
+      background: var(--bg2);
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wsid-filters {
+      padding: 0 16px 16px;
+      max-width: 520px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .wsid-filter-label {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .wsid-results {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 16px 16px;
+      max-width: 520px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .wsid-toggle-row {
+      display: flex;
+      justify-content: center;
+      padding: 0 16px 12px;
+    }
+    .wsid-toggle {
+      height: 40px;
+      padding: 0 20px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .wsid-toggle.active {
+      background: var(--cta);
+      color: white;
+      border-color: var(--cta);
+    }
+
+    /* === PICK ONE === */
+    .pick-one-card {
+      text-align: center;
+      padding: 48px 24px;
+    }
+    .pick-one-label {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      animation: breathe 3s ease-in-out infinite;
+    }
+    .pick-one-name {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+    .pick-one-meta {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+    .pick-one-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .pick-one-actions button {
+      height: 48px;
+      padding: 0 24px;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-letsgo {
+      background: var(--cta);
+      color: white;
+    }
+    html.dark .btn-letsgo {
+      box-shadow: 0 0 20px rgba(94,91,174,0.4);
+    }
+    .btn-letsgo:active { background: var(--cta-hover); }
+    .btn-nah {
+      background: var(--bg2);
+      color: var(--text-muted);
+    }
+    .pick-one-empty {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 48px 24px;
+      font-size: 15px;
+    }
+
+    /* === BOTTOM SHEET === */
+    .sheet-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(42,40,80,0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .sheet-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--card);
+      border-radius: 24px 24px 0 0;
+      z-index: 51;
+      transform: translateY(100%);
+      transition: transform 0.3s ease-out;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 24px 16px;
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+    }
+    .sheet.open { transform: translateY(0); }
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+    .sheet-title {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      color: var(--text);
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .sheet-section {
+      margin-bottom: 16px;
+    }
+    .sheet-section-label {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .sheet-input {
+      width: 100%;
+      height: 48px;
+      padding: 0 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 15px;
+      color: var(--text);
+      outline: none;
+    }
+    .sheet-input:focus { box-shadow: 0 0 0 3px var(--focus); }
+    .sheet-textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 12px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 15px;
+      color: var(--text);
+      outline: none;
+      resize: vertical;
+    }
+    .sheet-textarea:focus { box-shadow: 0 0 0 3px var(--focus); }
+    .sheet-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .sheet-actions button {
+      flex: 1;
+      height: 48px;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .sheet-btn-primary {
+      background: var(--cta);
+      color: white;
+    }
+    html.dark .sheet-btn-primary {
+      box-shadow: 0 0 20px rgba(94,91,174,0.4);
+    }
+    .sheet-btn-primary:active { background: var(--cta-hover); }
+    .sheet-btn-secondary {
+      background: var(--bg2);
+      color: var(--text-muted);
+    }
+    .sheet-dest-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .sheet-dest-btn {
+      flex: 1;
+      height: 48px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      background: var(--card);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sheet-dest-btn:active {
+      background: var(--cta);
+      color: white;
+      border-color: var(--cta);
+    }
+
+    /* === TEMPLATE TRAY === */
+    .template-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: transform 0.1s;
+      position: relative;
+    }
+    .template-card:active { transform: scale(0.98); }
+    .template-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .template-icon { font-size: 20px; }
+    .template-name {
+      font-weight: 600;
+      font-size: 15px;
+      flex: 1;
+    }
+    .template-count {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .template-edit-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      background: var(--bg);
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .template-edit-btn:active { background: var(--bg2); }
+    .btn-new-template {
+      width: 100%;
+      height: 48px;
+      border: 1.5px dashed var(--border);
+      border-radius: 16px;
+      background: transparent;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-new-template:active { background: var(--bg); }
+    .tpl-edit-section { margin-bottom: 16px; }
+    .tpl-edit-label {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: lowercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .tpl-icon-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+    .tpl-icon-cell {
+      width: 44px;
+      height: 44px;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      background: var(--bg);
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tpl-icon-cell.selected { border-color: var(--cta); background: var(--bg2); }
+    .tpl-icon-cell:active { background: var(--bg2); }
+    .tpl-task-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tpl-task-row .card-name { flex: 1; font-size: 14px; }
+    .tpl-task-time {
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: var(--bg);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border: none;
+      font-family: 'Quicksand', sans-serif;
+    }
+    .tpl-task-time:active { background: var(--bg2); }
+    .tpl-task-remove {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tpl-task-remove:active { background: var(--bg); }
+    .tpl-task-remove.confirming {
+      background: #C75450;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .tpl-add-task-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .tpl-add-task-row input {
+      flex: 1;
+      height: 40px;
+      padding: 0 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+    }
+    .tpl-add-task-row input:focus {
+      box-shadow: 0 0 0 3px var(--focus);
+    }
+    .tpl-add-task-row button {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      border: none;
+      border-radius: 10px;
+      background: var(--cta);
+      color: white;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-delete-template {
+      width: 100%;
+      height: 44px;
+      border: none;
+      background: transparent;
+      color: #C75450;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 16px;
+      border-radius: 12px;
+    }
+    .btn-delete-template:active { background: #FDF0EF; }
+    .btn-delete-template.confirming {
+      background: #C75450;
+      color: white;
+    }
+    .tpl-edit-error {
+      color: #C75450;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .template-tasks {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .template-task-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .template-task-item::before {
+      content: '\00B7';
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* === HINT TEXT === */
+    .hint-text {
+      font-size: 12px;
+      color: var(--accent);
+      margin: -8px 0 16px 4px;
+    }
+
+    /* === ANIMATIONS === */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.08); opacity: 1; }
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="loading">loading...</div>
+    <div id="app-content">
+      <header>
+        <h1>FlowState</h1>
+        <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" id="theme-btn">&#9790;</button>
+        <div class="streak-counter" id="streak-counter"></div>
+      </header>
+      <main>
+        <div id="view-today" class="view active"></div>
+        <div id="view-inbox" class="view"></div>
+        <div id="view-pile" class="view"></div>
+        <div id="view-backlog" class="view"></div>
+        <div id="view-done" class="view"></div>
+      </main>
+      <button id="wsid-fab" onclick="openWSID()">&#10022;</button>
+      <nav id="tab-nav" role="tablist">
+        <button class="tab-btn active" role="tab" aria-selected="true" data-tab="today" onclick="switchTab('today')"><span class="tab-icon">&#9728;&#65039;</span>today</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="inbox" onclick="switchTab('inbox')"><span class="tab-icon">&#128229;</span>inbox</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="pile" onclick="switchTab('pile')"><span class="tab-icon">&#128260;</span>pile</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="backlog" onclick="switchTab('backlog')"><span class="tab-icon">&#128203;</span>backlog</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="done" onclick="switchTab('done')"><span class="tab-icon">&#9989;</span>done</button>
+      </nav>
+      <div id="wsid-panel"></div>
+      <div class="sheet-overlay" id="sheet-overlay" onclick="closeSheet()"></div>
+      <div class="sheet" id="sheet"><div class="sheet-handle"></div><div id="sheet-content"></div></div>
+    </div>
+  </div>
+
+<script>
+// =======================================
+// POCKETBASE INIT
+// =======================================
+const pb = new PocketBase('http://192.168.5.204:8090');
+
+// =======================================
+// THEME
+// =======================================
+function initTheme() {
+  const saved = localStorage.getItem('flowstate_theme');
+  if (saved === 'dark') {
+    document.documentElement.classList.add('dark');
+  }
+  updateThemeBtn();
+}
+function toggleTheme() {
+  document.documentElement.classList.toggle('dark');
+  const isDark = document.documentElement.classList.contains('dark');
+  localStorage.setItem('flowstate_theme', isDark ? 'dark' : 'light');
+  updateThemeBtn();
+}
+function updateThemeBtn() {
+  const btn = document.getElementById('theme-btn');
+  if (!btn) return;
+  const isDark = document.documentElement.classList.contains('dark');
+  btn.innerHTML = isDark ? '&#9728;' : '&#9790;';
+}
+initTheme();
+
+// =======================================
+// DATA CACHE
+// =======================================
+let data = { tasks: [], placements: [], completions: [], templates: [] };
+
+async function loadAll() {
+  try {
+    const [tasks, placements, completions, templates] = await Promise.all([
+      pb.collection('flowstate_tasks').getFullList({ sort: 'created' }),
+      pb.collection('flowstate_placements').getFullList({ sort: 'created' }),
+      pb.collection('flowstate_completions').getFullList({ sort: '-created' }),
+      pb.collection('flowstate_templates').getFullList({ sort: 'created' })
+    ]);
+    data.tasks = tasks.map(function(t) {
+      return {
+        id: t.id,
+        name: t.name,
+        zone: t.zone,
+        energy: t.energy || null,
+        priority: t.priority || null,
+        time: t.time || null,
+        status: t.status || null,
+        kind: t.kind || 'task'
+      };
+    });
+    data.placements = placements.map(function(p) {
+      return {
+        id: p.id,
+        taskId: p.taskId,
+        date: p.date,
+        source: p.source
+      };
+    });
+    data.completions = completions.map(function(c) {
+      return {
+        id: c.id,
+        taskId: c.taskId,
+        placementId: c.placementId || null,
+        completedAt: c.completedAt,
+        note: c.note || ''
+      };
+    });
+    data.templates = templates.map(function(t) {
+      return {
+        id: t.id,
+        name: t.name,
+        icon: t.icon,
+        energy: t.energy,
+        tasks: t.tasks || []
+      };
+    });
+  } catch(e) {
+    console.error('Failed to load data:', e);
+  }
+}
+
+// =======================================
+// SEED DATA
+// =======================================
+async function seedIfEmpty() {
+  const existing = await pb.collection('flowstate_tasks').getFullList({ requestKey: 'seed-check' });
+  if (existing.length > 0) return;
+
+  const seedTasks = [
+    { name: 'respond to DMs', zone: 'pile', energy: 'easy', priority: 'important', time: '30m', status: 'available', kind: 'task' },
+    { name: "edit this week's video", zone: 'pile', energy: 'deep', priority: 'first', time: '2hr+', status: 'available', kind: 'task' },
+    { name: 'post tip bait content', zone: 'pile', energy: 'steady', priority: 'important', time: '15m', status: 'available', kind: 'task' },
+    { name: 'review ManyVids analytics', zone: 'backlog', energy: 'steady', priority: 'whenever', time: '30m', status: '', kind: 'task' },
+    { name: 'plan next filming batch', zone: 'backlog', energy: 'deep', priority: 'important', time: '1hr', status: '', kind: 'task' },
+    { name: 'update video gallery CSV', zone: 'backlog', energy: 'easy', priority: 'whenever', time: '15m', status: '', kind: 'task' },
+    { name: 'restock ring light bulbs', zone: 'inbox', energy: '', priority: '', time: '', status: '', kind: 'task' },
+    { name: 'try a pick your adventure style tip game', zone: 'inbox', energy: '', priority: '', time: '', status: '', kind: 'idea' },
+    { name: 'collab with another creator for cross-promo', zone: 'inbox', energy: '', priority: '', time: '', status: '', kind: 'idea' }
+  ];
+  for (const t of seedTasks) {
+    await pb.collection('flowstate_tasks').create(t);
+  }
+
+  const seedTemplates = [
+    {
+      name: 'Tuesday Fulfillment', icon: '\uD83D\uDCEC', energy: 'steady',
+      tasks: [
+        { name: 'send game DMs + prizes', time: '30m' },
+        { name: 'apply sub extensions', time: '15m' },
+        { name: 'message top 3 spenders', time: '15m' },
+        { name: 'post scheduled content', time: '15m' },
+        { name: 'send weekly mass DM', time: '15m' },
+        { name: 'collect name moan signups', time: '15m' }
+      ]
+    },
+    {
+      name: 'Filming Day', icon: '\uD83C\uDFAC', energy: 'deep',
+      tasks: [
+        { name: 'review shot list + outfits', time: '30m' },
+        { name: 'set up lighting + camera', time: '30m' },
+        { name: 'film personalized items', time: '1hr' },
+        { name: 'film custom orders', time: '1hr' },
+        { name: 'film scheduled videos', time: '2hr+' },
+        { name: 'backup footage to NAS', time: '15m' }
+      ]
+    },
+    {
+      name: 'Admin Hour', icon: '\uD83D\uDCCB', energy: 'easy',
+      tasks: [
+        { name: 'respond to DMs', time: '15m' },
+        { name: 'check platform notifications', time: '15m' },
+        { name: 'update tracking spreadsheets', time: '15m' },
+        { name: 'organize Dropbox folders', time: '15m' }
+      ]
+    },
+    {
+      name: 'Edit Session', icon: '\u2702\uFE0F', energy: 'deep',
+      tasks: [
+        { name: 'edit + watermark videos', time: '1hr' },
+        { name: 'cut teaser clips for tube sites', time: '30m' },
+        { name: 'add outro cards', time: '15m' },
+        { name: 'export + organize by platform', time: '30m' }
+      ]
+    },
+    {
+      name: 'Content Planning', icon: '\uD83D\uDCC5', energy: 'deep',
+      tasks: [
+        { name: "review last month's game performance", time: '30m' },
+        { name: "plan this month's tip games", time: '30m' },
+        { name: 'plan live stream schedule', time: '30m' },
+        { name: 'update content calendar', time: '30m' },
+        { name: 'plan filming batch for next month', time: '30m' }
+      ]
+    },
+    {
+      name: 'Upload Day', icon: '\uD83D\uDCE4', energy: 'steady',
+      tasks: [
+        { name: 'upload to ManyVids + write descriptions', time: '30m' },
+        { name: 'upload to Clips4Sale + tag', time: '30m' },
+        { name: 'schedule OF VIP post', time: '15m' },
+        { name: 'schedule OF Free posts', time: '15m' },
+        { name: 'upload teasers to tube sites', time: '30m' }
+      ]
+    }
+  ];
+  for (const t of seedTemplates) {
+    await pb.collection('flowstate_templates').create(t);
+  }
+}
+
+// =======================================
+// DATE UTILITIES
+// =======================================
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function formatTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) {
+    const parts = isoStr.split('T');
+    if (parts.length > 1) {
+      const timeParts = parts[1].split(':');
+      if (timeParts.length >= 2) {
+        let h = parseInt(timeParts[0], 10);
+        const m = timeParts[1];
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        if (h > 12) h -= 12;
+        if (h === 0) h = 12;
+        return h + ':' + m + ' ' + ampm;
+      }
+    }
+    return '';
+  }
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function dateLabel(dateStr) {
+  const today = todayStr();
+  if (dateStr === today) return 'today';
+  const y = new Date();
+  y.setDate(y.getDate() - 1);
+  const yStr = y.getFullYear() + '-' + String(y.getMonth()+1).padStart(2,'0') + '-' + String(y.getDate()).padStart(2,'0');
+  if (dateStr === yStr) return 'yesterday';
+  const d = new Date(dateStr + 'T12:00:00');
+  const now = new Date();
+  const diff = Math.floor((now - d) / 86400000);
+  if (diff < 7) return d.toLocaleDateString([], { weekday: 'long' }).toLowerCase();
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function localISOString() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0') + 'T' + String(d.getHours()).padStart(2,'0') + ':' +
+    String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+}
+
+function completionDate(isoStr) {
+  if (!isoStr) return todayStr();
+  return isoStr.split('T')[0];
+}
+
+// =======================================
+// STREAK COUNTER
+// =======================================
+function computeStreak() {
+  if (data.completions.length === 0) return 0;
+  const dates = new Set();
+  data.completions.forEach(function(c) {
+    if (c.completedAt) dates.add(completionDate(c.completedAt));
+  });
+  var streak = 0;
+  const now = new Date();
+  const todayS = todayStr();
+  if (!dates.has(todayS)) {
+    const y = new Date(now);
+    y.setDate(y.getDate() - 1);
+    const yStr = y.getFullYear() + '-' + String(y.getMonth()+1).padStart(2,'0') + '-' + String(y.getDate()).padStart(2,'0');
+    if (!dates.has(yStr)) return 0;
+    var d = new Date(now);
+    d.setDate(d.getDate() - 1);
+    while (true) {
+      var ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      if (dates.has(ds)) { streak++; d.setDate(d.getDate() - 1); }
+      else break;
+    }
+    return streak;
+  }
+  var d2 = new Date(now);
+  while (true) {
+    var ds2 = d2.getFullYear() + '-' + String(d2.getMonth()+1).padStart(2,'0') + '-' + String(d2.getDate()).padStart(2,'0');
+    if (dates.has(ds2)) { streak++; d2.setDate(d2.getDate() - 1); }
+    else break;
+  }
+  return streak;
+}
+
+function renderStreak() {
+  const el = document.getElementById('streak-counter');
+  if (!el) return;
+  const streak = computeStreak();
+  if (streak > 0) {
+    el.textContent = streak + ' day streak';
+  } else {
+    el.textContent = '';
+  }
+}
+
+// =======================================
+// SMART ENTRY PARSER
+// =======================================
+function parseEntry(text) {
+  var name = text.trim();
+  var energy = null, time = null, kind = 'task';
+
+  if (/^idea:\s*/i.test(name)) {
+    kind = 'idea';
+    name = name.replace(/^idea:\s*/i, '');
+  }
+
+  const energyRe = /\b(deep\s*work|deep|steady|easy)\b/i;
+  const em = name.match(energyRe);
+  if (em) {
+    energy = em[1].toLowerCase().startsWith('deep') ? 'deep' : em[1].toLowerCase();
+    name = name.replace(em[0], '');
+  }
+
+  const timeRe = /\b(15\s*m(?:in(?:utes?)?)?|30\s*m(?:in(?:utes?)?)?|1\s*h(?:r|our)?|2\s*h(?:r|ours?)?\+?)\b/i;
+  const tm = name.match(timeRe);
+  if (tm) {
+    const t = tm[1].toLowerCase().replace(/\s+/g, '');
+    if (t.startsWith('15')) time = '15m';
+    else if (t.startsWith('30')) time = '30m';
+    else if (t.startsWith('1')) time = '1hr';
+    else time = '2hr+';
+    name = name.replace(tm[0], '');
+  }
+
+  name = name.replace(/\s+/g, ' ').trim();
+  return { name: name, energy: energy, time: time, kind: kind };
+}
+
+function autoGrow(textarea) {
+  textarea.style.height = '48px';
+  if (textarea.scrollHeight > 48) {
+    textarea.style.height = Math.min(textarea.scrollHeight, 180) + 'px';
+    textarea.style.overflow = textarea.scrollHeight > 180 ? 'auto' : 'hidden';
+  }
+}
+
+function getLines(textarea) {
+  if (!textarea) return [];
+  return textarea.value.split('\n').filter(function(line) { return line.trim() !== ''; });
+}
+
+function updateAddButton(btnId, textareaId) {
+  const btn = document.getElementById(btnId);
+  const textarea = document.getElementById(textareaId);
+  if (!btn || !textarea) return;
+  const lines = getLines(textarea);
+  if (lines.length > 1) {
+    btn.textContent = 'add ' + lines.length;
+  } else {
+    btn.textContent = '+';
+  }
+}
+
+function handleTextareaKey(event, zone) {
+  if (event.key !== 'Enter') return;
+  const textarea = event.target;
+  const lines = getLines(textarea);
+  if (lines.length <= 1 && !event.shiftKey) {
+    event.preventDefault();
+    if (zone === 'inbox') inboxAdd();
+    else if (zone === 'pile') pileAdd();
+    else if (zone === 'backlog') backlogAdd();
+  }
+}
+
+// =======================================
+// RENDER HELPERS
+// =======================================
+function energyChip(energy) {
+  if (!energy) return '';
+  const labels = { deep: 'deep work', steady: 'steady', easy: 'easy' };
+  return '<span class="chip chip-' + energy + '">' + (labels[energy] || energy) + '</span>';
+}
+
+function timeChip(time) {
+  if (!time) return '';
+  return '<span class="chip chip-time">' + time + '</span>';
+}
+
+function priorityChip(priority) {
+  if (!priority) return '';
+  return '<span class="chip chip-priority">' + priority + '</span>';
+}
+
+function esc(str) {
+  if (!str) return '';
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// =======================================
+// STATE
+// =======================================
+let currentTab = 'today';
+let deleteState = { taskId: null, timeout: null };
+let sheetState = {};
+let tplEditState = { id: null, icon: '\uD83D\uDCCB', name: '', energy: 'steady', tasks: [] };
+let wsidState = { energy: null, time: null, pickOne: false, pickIndex: 0, skipped: new Set() };
+let doneFilter = null;
+
+// =======================================
+// SHEET MANAGEMENT
+// =======================================
+function openSheet(html) {
+  clearDeleteState();
+  document.getElementById('sheet-content').innerHTML = html;
+  document.getElementById('sheet').classList.add('open');
+  document.getElementById('sheet-overlay').classList.add('open');
+}
+
+function closeSheet() {
+  clearDeleteState();
+  document.getElementById('sheet').classList.remove('open');
+  document.getElementById('sheet-overlay').classList.remove('open');
+}
+
+function pickerRow(type, options, selected) {
+  return '<div class="picker-row">' + options.map(function(o) {
+    return '<button class="picker-chip ' + (type === 'energy' ? 'energy-' + o.val : '') + ' ' + (selected === o.val ? 'selected' : '') + '" onclick="sheetPick(\'' + type + '\',\'' + o.val + '\')">' + o.label + '</button>';
+  }).join('') + '</div>';
+}
+
+function sheetPick(type, val) {
+  sheetState[type] = sheetState[type] === val ? null : val;
+  reopenCurrentSheet();
+}
+
+function reopenCurrentSheet() {
+  if (sheetState.mode === 'triage') openTriageSheet(sheetState.taskId);
+  else if (sheetState.mode === 'edit') openEditSheet(sheetState.taskId);
+  else if (sheetState.mode === 'note') openNoteSheet(sheetState.taskId, sheetState.placementId);
+  else if (sheetState.mode === 'template-list') openTemplateTray();
+  else if (sheetState.mode === 'template-preview') openTemplatePreview(sheetState.templateId);
+  else if (sheetState.mode === 'template-edit') renderTemplateEdit();
+}
+
+// =======================================
+// TRIAGE SHEET
+// =======================================
+function openTriageSheet(taskId) {
+  const task = data.tasks.find(function(t) { return t.id === taskId; });
+  if (!task) return;
+  if (sheetState.mode !== 'triage' || sheetState.taskId !== taskId) {
+    sheetState = { mode: 'triage', taskId: taskId, energy: task.energy, priority: task.priority, time: task.time };
+  }
+  const energyOpts = [
+    { val: 'deep', label: '\uD83D\uDD34 deep work' },
+    { val: 'steady', label: '\uD83D\uDFE1 steady' },
+    { val: 'easy', label: '\uD83D\uDFE2 easy' }
+  ];
+  const priorityOpts = [
+    { val: 'first', label: 'first' },
+    { val: 'important', label: 'important' },
+    { val: 'whenever', label: 'whenever' }
+  ];
+  const timeOpts = [
+    { val: '15m', label: '15m' },
+    { val: '30m', label: '30m' },
+    { val: '1hr', label: '1hr' },
+    { val: '2hr+', label: '2hr+' }
+  ];
+  var html = '<div class="sheet-title">triage</div>';
+  html += '<div class="sheet-section"><div class="sheet-section-label">task</div><div style="font-size:15px;font-weight:500;padding:8px 0">' + esc(task.name) + '</div></div>';
+  html += '<div class="sheet-section"><div class="sheet-section-label">energy</div>' + pickerRow('energy', energyOpts, sheetState.energy) + '</div>';
+  html += '<div class="sheet-section"><div class="sheet-section-label">priority</div>' + pickerRow('priority', priorityOpts, sheetState.priority) + '</div>';
+  html += '<div class="sheet-section"><div class="sheet-section-label">time</div>' + pickerRow('time', timeOpts, sheetState.time) + '</div>';
+  html += '<div class="sheet-dest-row"><button class="sheet-dest-btn" onclick="triageTo(\'backlog\')">backlog</button><button class="sheet-dest-btn" onclick="triageTo(\'pile\')">pile</button><button class="sheet-dest-btn" onclick="triageTo(\'today\')">today</button></div>';
+  openSheet(html);
+}
+
+async function triageTo(dest) {
+  const task = data.tasks.find(function(t) { return t.id === sheetState.taskId; });
+  if (!task) return;
+  const updates = {
+    energy: sheetState.energy || '',
+    priority: sheetState.priority || '',
+    time: sheetState.time || '',
+    kind: 'task'
+  };
+
+  if (dest === 'today') {
+    updates.zone = 'backlog';
+    await pb.collection('flowstate_tasks').update(task.id, updates);
+    if (!hasActivePlacement(task.id, todayStr())) {
+      await pb.collection('flowstate_placements').create({ taskId: task.id, date: todayStr(), source: 'manual' });
+    }
+  } else if (dest === 'pile') {
+    updates.zone = 'pile';
+    updates.status = 'available';
+    await pb.collection('flowstate_tasks').update(task.id, updates);
+  } else {
+    updates.zone = 'backlog';
+    await pb.collection('flowstate_tasks').update(task.id, updates);
+  }
+  await loadAll();
+  closeSheet();
+  render();
+}
+
+// =======================================
+// EDIT SHEET
+// =======================================
+function openEditSheet(taskId) {
+  const task = data.tasks.find(function(t) { return t.id === taskId; });
+  if (!task) return;
+  if (sheetState.mode !== 'edit' || sheetState.taskId !== taskId) {
+    sheetState = { mode: 'edit', taskId: taskId, name: task.name, energy: task.energy, priority: task.priority, time: task.time };
+  }
+  const energyOpts = [
+    { val: 'deep', label: '\uD83D\uDD34 deep work' },
+    { val: 'steady', label: '\uD83D\uDFE1 steady' },
+    { val: 'easy', label: '\uD83D\uDFE2 easy' }
+  ];
+  const priorityOpts = [
+    { val: 'first', label: 'first' },
+    { val: 'important', label: 'important' },
+    { val: 'whenever', label: 'whenever' }
+  ];
+  const timeOpts = [
+    { val: '15m', label: '15m' },
+    { val: '30m', label: '30m' },
+    { val: '1hr', label: '1hr' },
+    { val: '2hr+', label: '2hr+' }
+  ];
+  var html = '<div class="sheet-title">edit task</div>';
+  html += '<div class="sheet-section"><div class="sheet-section-label">name</div><input class="sheet-input" id="edit-name-input" value="' + esc(sheetState.name) + '" /></div>';
+  html += '<div class="sheet-section"><div class="sheet-section-label">energy</div>' + pickerRow('energy', energyOpts, sheetState.energy) + '</div>';
+  html += '<div class="sheet-section"><div class="sheet-section-label">priority</div>' + pickerRow('priority', priorityOpts, sheetState.priority) + '</div>';
+  html += '<div class="sheet-section"><div class="sheet-section-label">time</div>' + pickerRow('time', timeOpts, sheetState.time) + '</div>';
+  html += '<div class="sheet-actions"><button class="sheet-btn-primary" onclick="saveEdit()">save</button></div>';
+  openSheet(html);
+}
+
+async function saveEdit() {
+  const task = data.tasks.find(function(t) { return t.id === sheetState.taskId; });
+  if (!task) return;
+  const nameInput = document.getElementById('edit-name-input');
+  const newName = nameInput ? nameInput.value.trim() : sheetState.name;
+  await pb.collection('flowstate_tasks').update(task.id, {
+    name: newName || task.name,
+    energy: sheetState.energy || '',
+    priority: sheetState.priority || '',
+    time: sheetState.time || ''
+  });
+  await loadAll();
+  closeSheet();
+  render();
+}
+
+// =======================================
+// NOTE CAPTURE SHEET
+// =======================================
+function openNoteSheet(taskId, placementId) {
+  sheetState = { mode: 'note', taskId: taskId, placementId: placementId };
+  const task = data.tasks.find(function(t) { return t.id === taskId; });
+  const name = task ? task.name : 'task';
+  var html = '<div class="sheet-title">task done \u2713</div>';
+  html += '<p style="text-align:center;color:var(--text-muted);margin-bottom:16px">' + esc(name) + '... add a note?</p>';
+  html += '<textarea class="sheet-textarea" id="note-textarea" placeholder="how\'d it go..."></textarea>';
+  html += '<div class="sheet-actions"><button class="sheet-btn-secondary" onclick="skipNote()">skip</button><button class="sheet-btn-primary" onclick="saveNote()">save</button></div>';
+  openSheet(html);
+}
+
+async function saveNote() {
+  const textarea = document.getElementById('note-textarea');
+  const note = textarea ? textarea.value.trim() : '';
+  await finishCompletion(sheetState.taskId, sheetState.placementId, note);
+  closeSheet();
+  render();
+}
+
+async function skipNote() {
+  await finishCompletion(sheetState.taskId, sheetState.placementId, '');
+  closeSheet();
+  render();
+}
+
+// =======================================
+// TEMPLATE TRAY
+// =======================================
+function openTemplateTray() {
+  sheetState = { mode: 'template-list' };
+  var html = '<div class="sheet-title">templates</div>';
+
+  if (data.templates.length === 0) {
+    html += '<div class="empty-state">no templates yet... create one to get started</div>';
+  }
+
+  data.templates.forEach(function(tpl) {
+    html += '<div class="template-card" onclick="openTemplatePreview(\'' + tpl.id + '\')">' +
+      '<button class="template-edit-btn" onclick="event.stopPropagation();openTemplateEdit(\'' + tpl.id + '\')">&#9998;&#65039;</button>' +
+      '<div class="template-header">' +
+      '<span class="template-icon">' + tpl.icon + '</span>' +
+      '<span class="template-name">' + esc(tpl.name) + '</span>' +
+      energyChip(tpl.energy) +
+      '<span class="template-count">' + tpl.tasks.length + ' tasks</span>' +
+      '</div></div>';
+  });
+
+  html += '<button class="btn-new-template" onclick="openTemplateEdit(null)">+ new template</button>';
+  openSheet(html);
+}
+
+function openTemplatePreview(id) {
+  const tpl = data.templates.find(function(t) { return t.id === id; });
+  if (!tpl) return;
+  sheetState = { mode: 'template-preview', templateId: id };
+  var html = '<div class="sheet-title">' + tpl.icon + ' ' + esc(tpl.name) + '</div>';
+  html += '<div class="template-tasks">';
+  tpl.tasks.forEach(function(t) {
+    html += '<div class="template-task-item">' + esc(t.name) + ' ' + energyChip(tpl.energy) + ' ' + timeChip(t.time) + '</div>';
+  });
+  html += '</div>';
+  html += '<div class="sheet-actions"><button class="sheet-btn-secondary" onclick="openTemplateTray()">back</button><button class="sheet-btn-secondary" onclick="openTemplateEdit(\'' + id + '\')">edit</button><button class="sheet-btn-primary" onclick="loadTemplate(\'' + id + '\')">load onto today</button></div>';
+  openSheet(html);
+}
+
+async function loadTemplate(id) {
+  const tpl = data.templates.find(function(t) { return t.id === id; });
+  if (!tpl) return;
+  const today = todayStr();
+  for (const t of tpl.tasks) {
+    const created = await pb.collection('flowstate_tasks').create({
+      name: t.name, zone: 'backlog',
+      energy: tpl.energy, priority: 'important', time: t.time,
+      status: '', kind: 'task'
+    });
+    await pb.collection('flowstate_placements').create({ taskId: created.id, date: today, source: 'template' });
+  }
+  await loadAll();
+  closeSheet();
+  switchTab('today');
+}
+
+const TPL_ICONS = ['\uD83D\uDCEC','\uD83C\uDFAC','\uD83D\uDCCB','\u2702\uFE0F','\uD83D\uDCC5','\uD83D\uDCE4','\uD83D\uDCE6','\uD83C\uDFA8','\uD83D\uDCAA','\uD83E\uDDF9','\uD83D\uDED2','\uD83D\uDCBB','\uD83C\uDFB5','\uD83D\uDCF8','\uD83C\uDFE0','\uD83D\uDCB0'];
+const TIME_OPTS = ['15m','30m','1hr','2hr+'];
+
+function openTemplateEdit(id) {
+  if (id) {
+    const tpl = data.templates.find(function(t) { return t.id === id; });
+    if (!tpl) return;
+    tplEditState = {
+      id: tpl.id,
+      icon: tpl.icon,
+      name: tpl.name,
+      energy: tpl.energy,
+      tasks: tpl.tasks.map(function(t) { return { name: t.name, time: t.time }; })
+    };
+  } else {
+    tplEditState = { id: null, icon: '\uD83D\uDCCB', name: '', energy: 'steady', tasks: [] };
+  }
+  renderTemplateEdit();
+}
+
+function renderTemplateEdit() {
+  const nameEl = document.getElementById('tpl-name-input');
+  if (nameEl) tplEditState.name = nameEl.value;
+  sheetState = { mode: 'template-edit' };
+  var html = '<div class="sheet-title">' + (tplEditState.id ? 'edit template' : 'new template') + '</div>';
+
+  html += '<div class="tpl-edit-section"><div class="tpl-edit-label">icon</div><div class="tpl-icon-grid">';
+  TPL_ICONS.forEach(function(icon) {
+    html += '<button class="tpl-icon-cell ' + (tplEditState.icon === icon ? 'selected' : '') + '" onclick="tplEditState.icon=\'' + icon + '\';renderTemplateEdit()">' + icon + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="tpl-edit-section"><div class="tpl-edit-label">name</div>';
+  html += '<input type="text" id="tpl-name-input" value="' + esc(tplEditState.name) + '" placeholder="template name..." style="width:100%;height:44px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);font-family:Quicksand,sans-serif;font-size:15px;color:var(--text);outline:none" oninput="tplEditState.name=this.value" />';
+  html += '</div>';
+
+  html += '<div class="tpl-edit-section"><div class="tpl-edit-label">energy</div><div class="picker-row">';
+  [{ val: 'deep', label: '\uD83D\uDD34 deep' }, { val: 'steady', label: '\uD83D\uDFE1 steady' }, { val: 'easy', label: '\uD83D\uDFE2 easy' }].forEach(function(o) {
+    html += '<button class="picker-chip energy-' + o.val + ' ' + (tplEditState.energy === o.val ? 'selected' : '') + '" onclick="tplEditState.energy=\'' + o.val + '\';renderTemplateEdit()">' + o.label + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="tpl-edit-section"><div class="tpl-edit-label">tasks (' + tplEditState.tasks.length + ')</div>';
+  tplEditState.tasks.forEach(function(t, i) {
+    html += '<div class="tpl-task-row"><span class="card-name">' + esc(t.name) + '</span><button class="tpl-task-time" onclick="cycleTplTaskTime(' + i + ')">' + t.time + '</button><button class="tpl-task-remove" id="tpl-rm-' + i + '" onclick="removeTplTask(' + i + ')">&times;</button></div>';
+  });
+  html += '<div class="tpl-add-task-row"><input type="text" id="tpl-task-input" placeholder="task name..." onkeydown="if(event.key===\'Enter\'){event.preventDefault();addTplTask()}" /><button onclick="addTplTask()">+</button></div>';
+  html += '</div>';
+
+  html += '<div id="tpl-edit-errors"></div>';
+
+  html += '<div class="sheet-actions"><button class="sheet-btn-secondary" onclick="openTemplateTray()">cancel</button><button class="sheet-btn-primary" onclick="saveTemplate()">save</button></div>';
+
+  if (tplEditState.id) {
+    html += '<button class="btn-delete-template" id="tpl-delete-btn" onclick="confirmDeleteTemplate()">delete template</button>';
+  }
+  openSheet(html);
+}
+
+function addTplTask() {
+  const input = document.getElementById('tpl-task-input');
+  if (!input || !input.value.trim()) return;
+  tplEditState.tasks.push({ name: input.value.trim(), time: '30m' });
+  renderTemplateEdit();
+  setTimeout(function() {
+    const newInput = document.getElementById('tpl-task-input');
+    if (newInput) newInput.focus();
+  }, 50);
+}
+
+function removeTplTask(index) {
+  const btn = document.getElementById('tpl-rm-' + index);
+  if (!btn) return;
+  if (btn.classList.contains('confirming')) {
+    tplEditState.tasks.splice(index, 1);
+    renderTemplateEdit();
+  } else {
+    btn.classList.add('confirming');
+    btn.textContent = 'sure?';
+    setTimeout(function() {
+      if (btn.parentElement) {
+        btn.classList.remove('confirming');
+        btn.textContent = '\u00d7';
+      }
+    }, 2500);
+  }
+}
+
+function cycleTplTaskTime(index) {
+  const t = tplEditState.tasks[index];
+  const ci = TIME_OPTS.indexOf(t.time);
+  t.time = TIME_OPTS[(ci + 1) % TIME_OPTS.length];
+  renderTemplateEdit();
+}
+
+async function saveTemplate() {
+  const nameInput = document.getElementById('tpl-name-input');
+  if (nameInput) tplEditState.name = nameInput.value.trim();
+
+  const errors = [];
+  if (!tplEditState.name) errors.push('give it a name...');
+  if (tplEditState.tasks.length === 0) errors.push('add at least one task...');
+
+  if (errors.length) {
+    const errEl = document.getElementById('tpl-edit-errors');
+    if (errEl) errEl.innerHTML = errors.map(function(e) { return '<div class="tpl-edit-error">' + e + '</div>'; }).join('');
+    return;
+  }
+
+  const tplData = {
+    icon: tplEditState.icon,
+    name: tplEditState.name,
+    energy: tplEditState.energy,
+    tasks: tplEditState.tasks.map(function(t) { return { name: t.name, time: t.time }; })
+  };
+
+  if (tplEditState.id) {
+    await pb.collection('flowstate_templates').update(tplEditState.id, tplData);
+  } else {
+    await pb.collection('flowstate_templates').create(tplData);
+  }
+
+  await loadAll();
+  openTemplateTray();
+}
+
+async function confirmDeleteTemplate() {
+  const btn = document.getElementById('tpl-delete-btn');
+  if (!btn) return;
+  if (btn.classList.contains('confirming')) {
+    await pb.collection('flowstate_templates').delete(tplEditState.id);
+    await loadAll();
+    openTemplateTray();
+  } else {
+    btn.classList.add('confirming');
+    btn.textContent = 'sure? delete';
+    setTimeout(function() {
+      if (btn.parentElement) {
+        btn.classList.remove('confirming');
+        btn.textContent = 'delete template';
+      }
+    }, 2500);
+  }
+}
+
+// =======================================
+// PLACEMENT + COMPLETION HELPERS
+// =======================================
+function hasActivePlacement(taskId, date) {
+  return data.placements.some(function(p) {
+    return p.taskId === taskId && p.date === date &&
+      !data.completions.some(function(c) { return c.placementId === p.id; });
+  });
+}
+
+function getTodayPlacements() {
+  return data.placements.filter(function(p) { return p.date === todayStr(); });
+}
+
+function isPlacementComplete(placementId) {
+  return data.completions.some(function(c) { return c.placementId === placementId; });
+}
+
+async function completeTask(taskId, placementId) {
+  const task = data.tasks.find(function(t) { return t.id === taskId; });
+  if (!task) return;
+
+  if (task.zone === 'pile') {
+    openNoteSheet(taskId, placementId);
+    return;
+  }
+
+  await pb.collection('flowstate_completions').create({
+    taskId: taskId, placementId: placementId || '',
+    completedAt: localISOString(), note: ''
+  });
+  if (task.zone === 'backlog') {
+    await pb.collection('flowstate_tasks').update(task.id, { zone: 'done' });
+  }
+  await loadAll();
+  render();
+}
+
+async function finishCompletion(taskId, placementId, note) {
+  const task = data.tasks.find(function(t) { return t.id === taskId; });
+  await pb.collection('flowstate_completions').create({
+    taskId: taskId, placementId: placementId || '',
+    completedAt: localISOString(), note: note || ''
+  });
+  if (task && task.zone === 'pile') {
+    await pb.collection('flowstate_tasks').update(task.id, { status: 'available' });
+  } else if (task && task.zone === 'backlog') {
+    await pb.collection('flowstate_tasks').update(task.id, { zone: 'done' });
+  }
+  await loadAll();
+}
+
+async function uncompleteTask(placementId) {
+  const comp = data.completions.find(function(c) { return c.placementId === placementId; });
+  if (!comp) return;
+  const task = data.tasks.find(function(t) { return t.id === comp.taskId; });
+  await pb.collection('flowstate_completions').delete(comp.id);
+  if (task && task.zone === 'done') {
+    await pb.collection('flowstate_tasks').update(task.id, { zone: 'backlog' });
+  }
+  if (task && task.zone === 'pile') {
+    await pb.collection('flowstate_tasks').update(task.id, { status: 'scheduled' });
+  }
+  await loadAll();
+  render();
+}
+
+// =======================================
+// TWO-TAP DELETE
+// =======================================
+function startDelete(taskId, e) {
+  e.stopPropagation();
+  if (deleteState.taskId === taskId) {
+    confirmDelete(taskId);
+    return;
+  }
+  clearDeleteState();
+  deleteState.taskId = taskId;
+  deleteState.timeout = setTimeout(function() {
+    deleteState = { taskId: null, timeout: null };
+    render();
+  }, 2500);
+  render();
+}
+
+async function confirmDelete(taskId) {
+  clearDeleteState();
+  const relatedPlacements = data.placements.filter(function(p) { return p.taskId === taskId; });
+  const relatedCompletions = data.completions.filter(function(c) { return c.taskId === taskId; });
+  for (const c of relatedCompletions) {
+    await pb.collection('flowstate_completions').delete(c.id);
+  }
+  for (const p of relatedPlacements) {
+    await pb.collection('flowstate_placements').delete(p.id);
+  }
+  await pb.collection('flowstate_tasks').delete(taskId);
+  await loadAll();
+  render();
+}
+
+function clearDeleteState() {
+  if (deleteState.timeout) clearTimeout(deleteState.timeout);
+  deleteState = { taskId: null, timeout: null };
+}
+
+function deleteBtn(taskId) {
+  if (deleteState.taskId === taskId) {
+    return '<button class="card-action delete-confirm" onclick="startDelete(\'' + taskId + '\',event)">sure?</button>';
+  }
+  return '<button class="card-action" onclick="startDelete(\'' + taskId + '\',event)">\u00d7</button>';
+}
+
+// =======================================
+// TODAY VIEW
+// =======================================
+function renderToday() {
+  const el = document.getElementById('view-today');
+  const placements = getTodayPlacements();
+  const active = [], done = [];
+  placements.forEach(function(p) {
+    if (isPlacementComplete(p.id)) done.push(p);
+    else active.push(p);
+  });
+
+  const total = placements.length;
+  const completedCount = done.length;
+  var html = '';
+
+  html += '<div class="input-bar"><input type="text" id="today-input" placeholder="add something for today..." onkeydown="if(event.key===\'Enter\')todayQuickAdd()" /><button class="btn-add" onclick="todayQuickAdd()">+</button><button class="btn-template" onclick="openTemplateTray()">\u26A1</button></div>';
+
+  if (total > 0) {
+    const pct = Math.round(completedCount / total * 100);
+    const allDone = completedCount === total;
+    html += '<div class="progress-bar"><span class="progress-label ' + (allDone ? 'complete' : '') + '">' + (allDone ? 'all done \u2713' : completedCount + ' of ' + total) + '</span><div class="progress-track"><div class="progress-fill ' + (allDone ? 'complete' : '') + '" style="width:' + pct + '%"></div></div></div>';
+  }
+
+  const priorityOrder = { first: 0, important: 1, whenever: 2 };
+  const sortedActive = active.map(function(p) {
+    return { p: p, task: data.tasks.find(function(t) { return t.id === p.taskId; }) };
+  }).filter(function(x) { return x.task; }).sort(function(a, b) {
+    return (priorityOrder[a.task.priority] != null ? priorityOrder[a.task.priority] : 3) - (priorityOrder[b.task.priority] != null ? priorityOrder[b.task.priority] : 3);
+  });
+
+  sortedActive.forEach(function(item) {
+    var p = item.p, task = item.task;
+    html += '<div class="task-card" data-task-id="' + task.id + '" data-zone="' + task.zone + '" onclick="cardTap(\'' + task.id + '\',\'' + task.zone + '\',event)">' +
+      '<div class="card-checkbox energy-' + (task.energy || '') + '" role="checkbox" aria-checked="false" aria-label="complete ' + esc(task.name) + '" onclick="completeTask(\'' + task.id + '\',\'' + p.id + '\');event.stopPropagation()" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){completeTask(\'' + task.id + '\',\'' + p.id + '\');event.preventDefault()}"></div>' +
+      '<div class="card-body"><div class="card-name">' + esc(task.name) + '</div><div class="card-meta">' + energyChip(task.energy) + timeChip(task.time) + (task.zone === 'pile' ? '<span class="chip chip-time">pile</span>' : '') + '</div></div>' +
+      '<div class="card-actions">' + deleteBtn(task.id) + '</div></div>';
+  });
+
+  if (sortedActive.length === 0 && done.length === 0) {
+    html += '<div class="empty-state">nothing planned for today...<br>add something or check the backlog</div>';
+  }
+
+  if (done.length > 0) {
+    html += '<div class="section-label">done today</div>';
+    done.forEach(function(p) {
+      const task = data.tasks.find(function(t) { return t.id === p.taskId; });
+      const name = task ? task.name : 'deleted task';
+      const energy = task ? task.energy : null;
+      html += '<div class="task-card done-card" onclick="uncompleteTask(\'' + p.id + '\')">' +
+        '<div class="card-checkbox checked" role="checkbox" aria-checked="true" aria-label="undo completion">\u2713</div>' +
+        '<div class="card-body"><div class="card-name">' + esc(name) + '</div><div class="card-meta">' + energyChip(energy) + '</div></div></div>';
+    });
+  }
+
+  if (new Date().getHours() >= 18 && done.length > 0) {
+    const counts = { deep: 0, steady: 0, easy: 0 };
+    done.forEach(function(p) {
+      const task = data.tasks.find(function(t) { return t.id === p.taskId; });
+      if (task && task.energy) counts[task.energy]++;
+    });
+    const parts = [];
+    if (counts.deep) parts.push(counts.deep + ' deep work');
+    if (counts.steady) parts.push(counts.steady + ' steady');
+    if (counts.easy) parts.push(counts.easy + ' easy');
+    html += '<div class="eod-summary">you got ' + done.length + ' thing' + (done.length !== 1 ? 's' : '') + ' done today' + (parts.length ? '... ' + parts.join(', ') : '') + '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+async function todayQuickAdd() {
+  const input = document.getElementById('today-input');
+  if (!input || !input.value.trim()) return;
+  const parsed = parseEntry(input.value);
+  if (!parsed.name) return;
+
+  const created = await pb.collection('flowstate_tasks').create({
+    name: parsed.name, zone: 'backlog',
+    energy: parsed.energy || 'steady',
+    priority: 'important',
+    time: parsed.time || '30m',
+    status: '', kind: parsed.kind
+  });
+  await pb.collection('flowstate_placements').create({ taskId: created.id, date: todayStr(), source: 'manual' });
+  await loadAll();
+  input.value = '';
+  render();
+}
+
+// =======================================
+// INBOX VIEW
+// =======================================
+function renderInbox() {
+  const el = document.getElementById('view-inbox');
+  const items = data.tasks.filter(function(t) { return t.zone === 'inbox'; });
+  var html = '';
+
+  html += '<div class="input-bar"><textarea id="inbox-input" rows="1" placeholder="add tasks... one per line" oninput="autoGrow(this);updateAddButton(\'inbox-add-btn\',\'inbox-input\')" onkeydown="handleTextareaKey(event,\'inbox\')"></textarea><button class="btn-add" id="inbox-add-btn" onclick="inboxAdd()">+</button></div>';
+  html += '<div class="hint-text">type "idea:" to capture a thought</div>';
+
+  const tasks = items.filter(function(i) { return i.kind === 'task'; });
+  const ideas = items.filter(function(i) { return i.kind === 'idea'; });
+
+  if (tasks.length === 0 && ideas.length === 0) {
+    html += '<div class="empty-state">inbox is clear... nice</div>';
+  }
+
+  tasks.forEach(function(task) {
+    html += '<div class="task-card" onclick="openTriageSheet(\'' + task.id + '\')">' +
+      '<div class="card-body"><div class="card-name">' + esc(task.name) + '</div><div class="card-meta">' + energyChip(task.energy) + timeChip(task.time) + '</div></div>' +
+      '<div class="card-actions"><button class="card-action evolve-btn" onclick="openTriageSheet(\'' + task.id + '\');event.stopPropagation()">triage</button>' + deleteBtn(task.id) + '</div></div>';
+  });
+
+  ideas.forEach(function(task) {
+    html += '<div class="task-card idea-card" onclick="openTriageSheet(\'' + task.id + '\')">' +
+      '<div class="card-body"><div class="card-name">\uD83D\uDCA1 ' + esc(task.name) + '</div></div>' +
+      '<div class="card-actions"><button class="card-action evolve-btn" onclick="evolveIdea(\'' + task.id + '\');event.stopPropagation()">evolve</button>' + deleteBtn(task.id) + '</div></div>';
+  });
+
+  el.innerHTML = html;
+}
+
+async function inboxAdd() {
+  const textarea = document.getElementById('inbox-input');
+  if (!textarea || !textarea.value.trim()) return;
+  const lines = getLines(textarea);
+  if (lines.length === 0) return;
+
+  for (const line of lines) {
+    const parsed = parseEntry(line);
+    if (!parsed.name) continue;
+    await pb.collection('flowstate_tasks').create({
+      name: parsed.name, zone: 'inbox',
+      energy: parsed.energy || '', priority: '',
+      time: parsed.time || '', status: '', kind: parsed.kind
+    });
+  }
+  await loadAll();
+  textarea.value = '';
+  autoGrow(textarea);
+  updateAddButton('inbox-add-btn', 'inbox-input');
+  render();
+}
+
+async function evolveIdea(taskId) {
+  const task = data.tasks.find(function(t) { return t.id === taskId; });
+  if (!task) return;
+  await pb.collection('flowstate_tasks').update(task.id, { kind: 'task' });
+  await loadAll();
+  openTriageSheet(taskId);
+}
+
+// =======================================
+// PILE VIEW
+// =======================================
+let pileInput = { energy: null, priority: null, time: null };
+
+function renderPile() {
+  const el = document.getElementById('view-pile');
+  const items = data.tasks.filter(function(t) { return t.zone === 'pile' && t.status === 'available'; });
+  var html = '';
+
+  html += '<div class="input-bar"><textarea id="pile-input" rows="1" placeholder="add recurring tasks... one per line" oninput="autoGrow(this);updateAddButton(\'pile-add-btn\',\'pile-input\')" onkeydown="handleTextareaKey(event,\'pile\')"></textarea><button class="btn-add" id="pile-add-btn" onclick="pileAdd()">+</button></div>';
+
+  const energyOpts = [{ val: 'deep', label: '\uD83D\uDD34 deep' }, { val: 'steady', label: '\uD83D\uDFE1 steady' }, { val: 'easy', label: '\uD83D\uDFE2 easy' }];
+  const priorityOpts = [{ val: 'first', label: 'first' }, { val: 'important', label: 'important' }, { val: 'whenever', label: 'whenever' }];
+  const timeOpts = [{ val: '15m', label: '15m' }, { val: '30m', label: '30m' }, { val: '1hr', label: '1hr' }, { val: '2hr+', label: '2hr+' }];
+
+  html += '<div class="picker-row">' + energyOpts.map(function(o) {
+    return '<button class="picker-chip energy-' + o.val + ' ' + (pileInput.energy === o.val ? 'selected' : '') + '" onclick="pileInput.energy=pileInput.energy===\'' + o.val + '\'?null:\'' + o.val + '\';render()">' + o.label + '</button>';
+  }).join('') + '</div>';
+  html += '<div class="picker-row">' + priorityOpts.map(function(o) {
+    return '<button class="picker-chip ' + (pileInput.priority === o.val ? 'selected' : '') + '" onclick="pileInput.priority=pileInput.priority===\'' + o.val + '\'?null:\'' + o.val + '\';render()">' + o.label + '</button>';
+  }).join('') + '</div>';
+  html += '<div class="picker-row" style="margin-bottom:16px">' + timeOpts.map(function(o) {
+    return '<button class="picker-chip ' + (pileInput.time === o.val ? 'selected' : '') + '" onclick="pileInput.time=pileInput.time===\'' + o.val + '\'?null:\'' + o.val + '\';render()">' + o.label + '</button>';
+  }).join('') + '</div>';
+
+  if (items.length === 0) {
+    html += '<div class="empty-state">no pile tasks yet...<br>add things you do regularly</div>';
+  }
+
+  items.forEach(function(task) {
+    const dots = getHabitDots(task.id);
+    html += '<div class="task-card" onclick="cardTap(\'' + task.id + '\',\'pile\',event)">' +
+      '<div class="card-body"><div class="card-name">' + esc(task.name) + '</div>' +
+      '<div class="card-meta">' + energyChip(task.energy) + priorityChip(task.priority) + timeChip(task.time) + '</div>' +
+      '<div class="habit-dots">' + dots.map(function(d) { return '<div class="habit-dot ' + (d ? 'filled' : '') + '"></div>'; }).join('') + '</div></div>' +
+      '<div class="card-actions"><button class="card-action schedule-btn" onclick="schedulePile(\'' + task.id + '\');event.stopPropagation()">today</button>' + deleteBtn(task.id) + '</div></div>';
+  });
+
+  el.innerHTML = html;
+}
+
+async function pileAdd() {
+  const textarea = document.getElementById('pile-input');
+  if (!textarea || !textarea.value.trim()) return;
+  const lines = getLines(textarea);
+  if (lines.length === 0) return;
+
+  for (const line of lines) {
+    const parsed = parseEntry(line);
+    if (!parsed.name) continue;
+    await pb.collection('flowstate_tasks').create({
+      name: parsed.name, zone: 'pile',
+      energy: parsed.energy || pileInput.energy || '',
+      priority: pileInput.priority || 'important',
+      time: parsed.time || pileInput.time || '',
+      status: 'available', kind: 'task'
+    });
+  }
+  await loadAll();
+  textarea.value = '';
+  autoGrow(textarea);
+  updateAddButton('pile-add-btn', 'pile-input');
+  render();
+}
+
+async function schedulePile(taskId) {
+  const task = data.tasks.find(function(t) { return t.id === taskId; });
+  if (!task) return;
+  const today = todayStr();
+  if (hasActivePlacement(taskId, today)) return;
+  await pb.collection('flowstate_tasks').update(task.id, { status: 'scheduled' });
+  await pb.collection('flowstate_placements').create({ taskId: taskId, date: today, source: 'manual' });
+  await loadAll();
+  render();
+}
+
+function getHabitDots(taskId) {
+  const dots = [];
+  const now = new Date();
+  for (var i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    const done = data.completions.some(function(c) { return c.taskId === taskId && c.completedAt && c.completedAt.startsWith(ds); });
+    dots.push(done);
+  }
+  return dots;
+}
+
+// =======================================
+// BACKLOG VIEW
+// =======================================
+let backlogInput = { energy: null, priority: null, time: null };
+
+function renderBacklog() {
+  const el = document.getElementById('view-backlog');
+  const items = data.tasks.filter(function(t) { return t.zone === 'backlog'; });
+  var html = '';
+
+  html += '<div class="input-bar"><textarea id="backlog-input" rows="1" placeholder="add tasks... one per line" oninput="autoGrow(this);updateAddButton(\'backlog-add-btn\',\'backlog-input\')" onkeydown="handleTextareaKey(event,\'backlog\')"></textarea><button class="btn-add" id="backlog-add-btn" onclick="backlogAdd()">+</button></div>';
+
+  const energyOpts = [{ val: 'deep', label: '\uD83D\uDD34 deep' }, { val: 'steady', label: '\uD83D\uDFE1 steady' }, { val: 'easy', label: '\uD83D\uDFE2 easy' }];
+  const priorityOpts = [{ val: 'first', label: 'first' }, { val: 'important', label: 'important' }, { val: 'whenever', label: 'whenever' }];
+  const timeOpts = [{ val: '15m', label: '15m' }, { val: '30m', label: '30m' }, { val: '1hr', label: '1hr' }, { val: '2hr+', label: '2hr+' }];
+
+  html += '<div class="picker-row">' + energyOpts.map(function(o) {
+    return '<button class="picker-chip energy-' + o.val + ' ' + (backlogInput.energy === o.val ? 'selected' : '') + '" onclick="backlogInput.energy=backlogInput.energy===\'' + o.val + '\'?null:\'' + o.val + '\';render()">' + o.label + '</button>';
+  }).join('') + '</div>';
+  html += '<div class="picker-row">' + priorityOpts.map(function(o) {
+    return '<button class="picker-chip ' + (backlogInput.priority === o.val ? 'selected' : '') + '" onclick="backlogInput.priority=backlogInput.priority===\'' + o.val + '\'?null:\'' + o.val + '\';render()">' + o.label + '</button>';
+  }).join('') + '</div>';
+  html += '<div class="picker-row" style="margin-bottom:16px">' + timeOpts.map(function(o) {
+    return '<button class="picker-chip ' + (backlogInput.time === o.val ? 'selected' : '') + '" onclick="backlogInput.time=backlogInput.time===\'' + o.val + '\'?null:\'' + o.val + '\';render()">' + o.label + '</button>';
+  }).join('') + '</div>';
+
+  if (items.length === 0) {
+    html += '<div class="empty-state">backlog is empty...<br>triage some inbox items or add tasks here</div>';
+  }
+
+  items.forEach(function(task) {
+    const scheduled = hasActivePlacement(task.id, todayStr());
+    html += '<div class="task-card" onclick="cardTap(\'' + task.id + '\',\'backlog\',event)">' +
+      '<div class="card-body"><div class="card-name">' + esc(task.name) + '</div><div class="card-meta">' + energyChip(task.energy) + priorityChip(task.priority) + timeChip(task.time) + '</div></div>' +
+      '<div class="card-actions">' +
+      (scheduled
+        ? '<span style="font-size:11px;color:var(--success);font-weight:600">scheduled</span>'
+        : '<button class="card-action schedule-btn" onclick="scheduleBacklog(\'' + task.id + '\');event.stopPropagation()">today</button>'
+      ) +
+      deleteBtn(task.id) + '</div></div>';
+  });
+
+  el.innerHTML = html;
+}
+
+async function backlogAdd() {
+  const textarea = document.getElementById('backlog-input');
+  if (!textarea || !textarea.value.trim()) return;
+  const lines = getLines(textarea);
+  if (lines.length === 0) return;
+
+  for (const line of lines) {
+    const parsed = parseEntry(line);
+    if (!parsed.name) continue;
+    await pb.collection('flowstate_tasks').create({
+      name: parsed.name, zone: 'backlog',
+      energy: parsed.energy || backlogInput.energy || '',
+      priority: backlogInput.priority || 'important',
+      time: parsed.time || backlogInput.time || '',
+      status: '', kind: 'task'
+    });
+  }
+  await loadAll();
+  textarea.value = '';
+  autoGrow(textarea);
+  updateAddButton('backlog-add-btn', 'backlog-input');
+  render();
+}
+
+async function scheduleBacklog(taskId) {
+  const today = todayStr();
+  if (hasActivePlacement(taskId, today)) return;
+  await pb.collection('flowstate_placements').create({ taskId: taskId, date: today, source: 'manual' });
+  await loadAll();
+  render();
+}
+
+// =======================================
+// DONE VIEW
+// =======================================
+function renderDone() {
+  const el = document.getElementById('view-done');
+  var html = '';
+
+  html += '<div class="filter-row">' +
+    '<button class="filter-chip ' + (doneFilter === null ? 'active' : '') + '" onclick="doneFilter=null;render()">all</button>' +
+    '<button class="filter-chip ' + (doneFilter === 'deep' ? 'active' : '') + '" onclick="doneFilter=\'deep\';render()">\uD83D\uDD34 deep</button>' +
+    '<button class="filter-chip ' + (doneFilter === 'steady' ? 'active' : '') + '" onclick="doneFilter=\'steady\';render()">\uD83D\uDFE1 steady</button>' +
+    '<button class="filter-chip ' + (doneFilter === 'easy' ? 'active' : '') + '" onclick="doneFilter=\'easy\';render()">\uD83D\uDFE2 easy</button></div>';
+
+  var completions = data.completions.slice().sort(function(a, b) {
+    return (b.completedAt || '').localeCompare(a.completedAt || '');
+  });
+
+  if (doneFilter) {
+    completions = completions.filter(function(c) {
+      const task = data.tasks.find(function(t) { return t.id === c.taskId; });
+      return task && task.energy === doneFilter;
+    });
+  }
+
+  if (completions.length === 0) {
+    html += '<div class="empty-state">nothing here yet...<br>check back soon</div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  const grouped = {};
+  completions.forEach(function(c) {
+    const d = completionDate(c.completedAt);
+    if (!grouped[d]) grouped[d] = [];
+    grouped[d].push(c);
+  });
+
+  Object.keys(grouped).sort(function(a, b) { return b.localeCompare(a); }).forEach(function(date) {
+    html += '<div class="date-header">' + dateLabel(date) + '</div>';
+    grouped[date].forEach(function(c) {
+      const task = data.tasks.find(function(t) { return t.id === c.taskId; });
+      const name = task ? task.name : 'deleted task';
+      const energy = task ? task.energy : null;
+      html += '<div class="done-entry"><div class="done-entry-name">' + esc(name) + '</div>' +
+        '<div class="done-entry-meta">' + energyChip(energy) + ' <span class="done-entry-time">' + formatTime(c.completedAt) + '</span></div>' +
+        (c.note ? '<div class="done-entry-note">"' + esc(c.note) + '"</div>' : '') + '</div>';
+    });
+  });
+
+  el.innerHTML = html;
+}
+
+// =======================================
+// WSID PANEL
+// =======================================
+function openWSID() {
+  wsidState = { energy: null, time: null, pickOne: false, pickIndex: 0, skipped: new Set() };
+  renderWSID();
+  document.getElementById('wsid-panel').classList.add('open');
+  document.getElementById('wsid-fab').style.display = 'none';
+}
+
+function closeWSID() {
+  document.getElementById('wsid-panel').classList.remove('open');
+  document.getElementById('wsid-fab').style.display = '';
+}
+
+function getWSIDResults() {
+  const today = todayStr();
+  const todayPlacements = data.placements.filter(function(p) { return p.date === today; });
+  const completedPIds = new Set(data.completions.filter(function(c) {
+    return todayPlacements.some(function(p) { return p.id === c.placementId; });
+  }).map(function(c) { return c.placementId; }));
+  const todayTaskIds = new Set(todayPlacements.map(function(p) { return p.taskId; }));
+
+  const todayTasks = todayPlacements
+    .filter(function(p) { return !completedPIds.has(p.id); })
+    .map(function(p) { return data.tasks.find(function(t) { return t.id === p.taskId; }); })
+    .filter(Boolean);
+
+  const backlogTasks = data.tasks.filter(function(t) { return t.zone === 'backlog' && !todayTaskIds.has(t.id); });
+  const pileTasks = data.tasks.filter(function(t) { return t.zone === 'pile' && t.status === 'available'; });
+
+  var results = [].concat(todayTasks, backlogTasks, pileTasks);
+
+  const seen = new Set();
+  results = results.filter(function(t) {
+    if (seen.has(t.id)) return false;
+    seen.add(t.id);
+    return true;
+  });
+
+  if (wsidState.energy) {
+    results = results.filter(function(t) { return t.energy === wsidState.energy; });
+  }
+
+  if (wsidState.time) {
+    const order = ['15m', '30m', '1hr', '2hr+'];
+    const maxIdx = order.indexOf(wsidState.time);
+    results = results.filter(function(t) { return !t.time || order.indexOf(t.time) <= maxIdx; });
+  }
+
+  const po = { first: 0, important: 1, whenever: 2 };
+  results.sort(function(a, b) {
+    return (po[a.priority] != null ? po[a.priority] : 3) - (po[b.priority] != null ? po[b.priority] : 3);
+  });
+
+  return results;
+}
+
+function renderWSID() {
+  const panel = document.getElementById('wsid-panel');
+  const results = getWSIDResults();
+
+  var html = '<div class="wsid-header"><span class="wsid-title">what should I do?</span><button class="wsid-close" onclick="closeWSID()">\u00d7</button></div>';
+
+  html += '<div class="wsid-filters"><div class="wsid-filter-label">energy</div><div class="filter-row">' +
+    '<button class="filter-chip ' + (wsidState.energy === null ? 'active' : '') + '" onclick="wsidFilter(\'energy\',null)">all</button>' +
+    '<button class="filter-chip ' + (wsidState.energy === 'deep' ? 'active' : '') + '" onclick="wsidFilter(\'energy\',\'deep\')">\uD83D\uDD34 deep</button>' +
+    '<button class="filter-chip ' + (wsidState.energy === 'steady' ? 'active' : '') + '" onclick="wsidFilter(\'energy\',\'steady\')">\uD83D\uDFE1 steady</button>' +
+    '<button class="filter-chip ' + (wsidState.energy === 'easy' ? 'active' : '') + '" onclick="wsidFilter(\'energy\',\'easy\')">\uD83D\uDFE2 easy</button></div>' +
+    '<div class="wsid-filter-label">time</div><div class="filter-row">' +
+    '<button class="filter-chip ' + (wsidState.time === null ? 'active' : '') + '" onclick="wsidFilter(\'time\',null)">all</button>' +
+    '<button class="filter-chip ' + (wsidState.time === '15m' ? 'active' : '') + '" onclick="wsidFilter(\'time\',\'15m\')">15m</button>' +
+    '<button class="filter-chip ' + (wsidState.time === '30m' ? 'active' : '') + '" onclick="wsidFilter(\'time\',\'30m\')">30m</button>' +
+    '<button class="filter-chip ' + (wsidState.time === '1hr' ? 'active' : '') + '" onclick="wsidFilter(\'time\',\'1hr\')">1hr</button>' +
+    '<button class="filter-chip ' + (wsidState.time === '2hr+' ? 'active' : '') + '" onclick="wsidFilter(\'time\',\'2hr+\')">2hr+</button></div></div>';
+
+  html += '<div class="wsid-toggle-row"><button class="wsid-toggle ' + (wsidState.pickOne ? 'active' : '') + '" onclick="togglePickOne()">just pick one</button></div>';
+
+  html += '<div class="wsid-results">';
+
+  if (wsidState.pickOne) {
+    const available = results.filter(function(t) { return !wsidState.skipped.has(t.id); });
+    if (available.length === 0) {
+      html += '<div class="pick-one-empty">you skipped them all...<br>maybe rest is the move</div>';
+    } else {
+      const task = available[0];
+      html += '<div class="pick-one-card"><div class="pick-one-label">how about this</div>' +
+        '<div class="pick-one-name">' + esc(task.name) + '</div>' +
+        '<div class="pick-one-meta">' + energyChip(task.energy) + timeChip(task.time) + priorityChip(task.priority) + '</div>' +
+        '<div class="pick-one-actions"><button class="btn-nah" onclick="wsidSkip(\'' + task.id + '\')">nah, next</button>' +
+        '<button class="btn-letsgo" onclick="wsidLetsGo(\'' + task.id + '\')">let\'s go</button></div></div>';
+    }
+  } else {
+    if (results.length === 0) {
+      html += '<div class="empty-state">nothing matches...<br>try different filters</div>';
+    }
+    results.forEach(function(task) {
+      const alreadyToday = hasActivePlacement(task.id, todayStr());
+      html += '<div class="task-card"><div class="card-body"><div class="card-name">' + esc(task.name) + '</div>' +
+        '<div class="card-meta">' + energyChip(task.energy) + priorityChip(task.priority) + timeChip(task.time) + '</div></div>' +
+        '<div class="card-actions">' +
+        (alreadyToday
+          ? '<span style="font-size:11px;color:var(--success);font-weight:600">on today</span>'
+          : '<button class="card-action schedule-btn" onclick="wsidLetsGo(\'' + task.id + '\')">today</button>'
+        ) + '</div></div>';
+    });
+  }
+
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+function wsidFilter(type, val) {
+  wsidState[type] = val;
+  wsidState.skipped = new Set();
+  wsidState.pickIndex = 0;
+  renderWSID();
+}
+
+function togglePickOne() {
+  wsidState.pickOne = !wsidState.pickOne;
+  wsidState.skipped = new Set();
+  wsidState.pickIndex = 0;
+  renderWSID();
+}
+
+function wsidSkip(taskId) {
+  wsidState.skipped.add(taskId);
+  renderWSID();
+}
+
+async function wsidLetsGo(taskId) {
+  const task = data.tasks.find(function(t) { return t.id === taskId; });
+  if (!task) return;
+  const today = todayStr();
+  if (!hasActivePlacement(taskId, today)) {
+    if (task.zone === 'pile') {
+      await pb.collection('flowstate_tasks').update(task.id, { status: 'scheduled' });
+    }
+    await pb.collection('flowstate_placements').create({ taskId: taskId, date: today, source: 'manual' });
+    await loadAll();
+  }
+  closeWSID();
+  switchTab('today');
+}
+
+// =======================================
+// CARD TAP (EDIT/TRIAGE)
+// =======================================
+function cardTap(taskId, zone, e) {
+  if (e.target.closest('.card-action') || e.target.closest('.card-checkbox')) return;
+  if (zone === 'inbox') {
+    openTriageSheet(taskId);
+  } else {
+    openEditSheet(taskId);
+  }
+}
+
+// =======================================
+// TAB NAVIGATION
+// =======================================
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+  document.getElementById('view-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    const isActive = b.dataset.tab === tab;
+    b.classList.toggle('active', isActive);
+    b.setAttribute('aria-selected', isActive);
+  });
+  clearDeleteState();
+  render();
+}
+
+function render() {
+  switch(currentTab) {
+    case 'today': renderToday(); break;
+    case 'inbox': renderInbox(); break;
+    case 'pile': renderPile(); break;
+    case 'backlog': renderBacklog(); break;
+    case 'done': renderDone(); break;
+  }
+  renderStreak();
+}
+
+// =======================================
+// INIT
+// =======================================
+async function init() {
+  try {
+    await seedIfEmpty();
+    await loadAll();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app-content').classList.add('loaded');
+    render();
+  } catch(e) {
+    console.error('Init failed:', e);
+    document.getElementById('loading').textContent = 'hmm something went wrong... check your connection and try again';
+  }
+}
+
+init();
+</script>
+</body>
+</html>
