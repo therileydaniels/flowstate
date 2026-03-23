@@ -1159,10 +1159,10 @@ let data = { tasks: [], placements: [], completions: [], templates: [] };
 async function loadAll() {
   try {
     const [tasks, placements, completions, templates] = await Promise.all([
-      pb.collection('flowstate_tasks').getFullList({ sort: 'created' }),
-      pb.collection('flowstate_placements').getFullList({ sort: 'created' }),
-      pb.collection('flowstate_completions').getFullList({ sort: '-created' }),
-      pb.collection('flowstate_templates').getFullList({ sort: 'created' })
+      pb.collection('flowstate_tasks').getFullList(),
+      pb.collection('flowstate_placements').getFullList(),
+      pb.collection('flowstate_completions').getFullList(),
+      pb.collection('flowstate_templates').getFullList()
     ]);
     data.tasks = tasks.map(function(t) {
       return {
