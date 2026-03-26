@@ -534,6 +534,17 @@
       font-size: 12px;
       color: var(--accent);
     }
+    .note-link {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--cta);
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: 'Quicksand', sans-serif;
+    }
+    .note-link:active { opacity: 0.7; }
     .date-header {
       font-family: 'Fredoka', sans-serif;
       font-weight: 600;
@@ -2001,6 +2012,30 @@ async function skipNote() {
   render();
 }
 
+function openEditNoteSheet(completionId) {
+  var comp = data.completions.find(function(c) { return c.id === completionId; });
+  if (!comp) return;
+  var task = data.tasks.find(function(t) { return t.id === comp.taskId; });
+  var name = task ? task.name : 'task';
+  sheetState = { mode: 'edit-note', completionId: completionId };
+  var html = '<div class="sheet-title">edit note</div>';
+  html += '<p style="text-align:center;color:var(--text-muted);margin-bottom:16px">' + esc(name) + '</p>';
+  html += '<textarea class="sheet-textarea" id="note-textarea" placeholder="how\'d it go...">' + esc(comp.note || '') + '</textarea>';
+  html += '<div class="sheet-actions"><button class="sheet-btn-secondary" onclick="closeSheet()">cancel</button><button class="sheet-btn-primary" onclick="saveEditNote()">save</button></div>';
+  openSheet(html);
+}
+
+async function saveEditNote() {
+  var textarea = document.getElementById('note-textarea');
+  var note = textarea ? textarea.value.trim() : '';
+  var completionId = sheetState.completionId;
+  if (!completionId) return;
+  await pb.collection('flowstate_completions').update(completionId, { note: note });
+  await loadAll();
+  closeSheet();
+  render();
+}
+
 // =======================================
 // TEMPLATE TRAY
 // =======================================
@@ -2562,9 +2597,12 @@ function renderToday() {
       const task = data.tasks.find(function(t) { return t.id === p.taskId; });
       const name = task ? task.name : 'deleted task';
       const energy = task ? task.energy : null;
-      html += '<div class="task-card done-card" onclick="uncompleteTask(\'' + p.id + '\')">' +
-        '<div class="card-checkbox checked" role="checkbox" aria-checked="true" aria-label="undo completion">\u2713</div>' +
-        '<div class="card-body"><div class="card-name">' + esc(name) + '</div><div class="card-meta">' + energyChip(energy) + '</div></div></div>';
+      const comp = data.completions.find(function(c) { return c.placementId === p.id; });
+      html += '<div class="task-card done-card">' +
+        '<div class="card-checkbox checked" role="checkbox" aria-checked="true" aria-label="undo completion" onclick="uncompleteTask(\'' + p.id + '\')">\u2713</div>' +
+        '<div class="card-body"><div class="card-name">' + esc(name) + '</div><div class="card-meta">' + energyChip(energy) + '</div>' +
+        (comp && comp.note ? '<div class="done-entry-note">"' + esc(comp.note) + '" <button class="note-link" onclick="openEditNoteSheet(\'' + comp.id + '\');event.stopPropagation()">edit</button></div>' : (comp ? '<button class="note-link" onclick="openEditNoteSheet(\'' + comp.id + '\');event.stopPropagation()">add note</button>' : '')) +
+        '</div></div>';
     });
   }
 
@@ -3033,7 +3071,7 @@ function renderDone() {
       const energy = task ? task.energy : null;
       html += '<div class="done-entry"><div class="done-entry-name">' + esc(name) + '</div>' +
         '<div class="done-entry-meta">' + energyChip(energy) + ' <span class="done-entry-time">' + formatTime(c.completedAt) + '</span></div>' +
-        (c.note ? '<div class="done-entry-note">"' + esc(c.note) + '"</div>' : '') + '</div>';
+        (c.note ? '<div class="done-entry-note">"' + esc(c.note) + '" <button class="note-link" onclick="openEditNoteSheet(\'' + c.id + '\')">edit</button></div>' : '<button class="note-link" onclick="openEditNoteSheet(\'' + c.id + '\')">add note</button>') + '</div>';
     });
   });
 
