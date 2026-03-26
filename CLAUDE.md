@@ -17,33 +17,38 @@ Personal energy-aware task management app. Uses priority x energy as its decisio
 - Access URL: `http://192.168.5.204:8090/flowstate/`
 - Admin UI: `http://192.168.5.204:8090/_/`
 
-## Design System: Rose/Pink
+## Design System: Purple/Indigo
 CSS variables — no hardcoded hex values anywhere except energy colors (functional, not brand):
 
 :root {
-  --bg: #F5E6E8;
-  --bg2: #F7D6E2;
-  --cta: #C0396B;
-  --cta-hover: #9e2d56;
-  --accent: #bb99ff;
+  --bg: #F0EEFC;
+  --bg2: #E0DCF8;
+  --cta: #5E5BAE;
+  --cta-hover: #4E4A9A;
+  --accent: #A8A6D8;
   --success: #8AAEAA;
-  --text: #533f4c;
-  --text-muted: #8a6a7a;
-  --border: #E8C4CF;
+  --text: #2A2850;
+  --text-muted: #6A68A0;
+  --border: #C8C4EC;
   --card: #FFFFFF;
-  --shadow: rgba(255,161,196,0.15);
-  --focus: rgba(255,161,196,0.50);
+  --shadow: rgba(94,91,174,0.08);
+  --focus: rgba(94,91,174,0.15);
 }
 
 Dark mode (html.dark):
-  --bg: #1c0f18;
-  --bg2: #2d1f3d;
-  --cta-hover: #d94a7d;
+  --bg: #1a1832;
+  --bg2: #2a2850;
+  --cta: #7B78C8;
+  --cta-hover: #9390D8;
+  --accent: #A8A6D8;
+  --success: #6A9E8A;
   --text: #FFFFFF;
-  --text-muted: #bb99ff;
-  --border: #4a2040;
-  --card: #2d1f3d;
-  CTA buttons get glow: box-shadow: 0 0 20px rgba(192,57,107,0.4)
+  --text-muted: #A8A6D8;
+  --border: #3a3868;
+  --card: #2a2850;
+  --shadow: rgba(94,91,174,0.2);
+  --focus: rgba(94,91,174,0.3);
+  CTA buttons get glow: box-shadow: 0 0 20px rgba(94,91,174,0.4)
 
 Fonts:
 - Display/logo: Pacifico 400
