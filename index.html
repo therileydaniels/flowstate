@@ -2334,24 +2334,42 @@ async function onTouchDragEnd(e) {
 
 async function reorderPlacements(fromId, toId) {
   var today = todayStr();
-  var placements = getTodayPlacements().filter(function(p) {
+  var allActive = getTodayPlacements().filter(function(p) {
     return !isPlacementComplete(p.id);
+  });
+
+  var fromPlacement = allActive.find(function(p) { return p.id === fromId; });
+  var toPlacement = allActive.find(function(p) { return p.id === toId; });
+  if (!fromPlacement || !toPlacement) return;
+
+  var fromTask = data.tasks.find(function(t) { return t.id === fromPlacement.taskId; });
+  var toTask = data.tasks.find(function(t) { return t.id === toPlacement.taskId; });
+  if (!fromTask || !toTask) return;
+
+  // Only reorder within same group
+  var fromIsPile = fromTask.zone === 'pile';
+  var toIsPile = toTask.zone === 'pile';
+  if (fromIsPile !== toIsPile) return;
+
+  var groupPlacements = allActive.filter(function(p) {
+    var t = data.tasks.find(function(tk) { return tk.id === p.taskId; });
+    return t && (t.zone === 'pile') === fromIsPile;
   }).sort(function(a, b) {
     var sa = a.sortOrder || 0, sb = b.sortOrder || 0;
     if (sa !== sb) return sa - sb;
     return a.id.localeCompare(b.id);
   });
 
-  var fromIdx = placements.findIndex(function(p) { return p.id === fromId; });
-  var toIdx = placements.findIndex(function(p) { return p.id === toId; });
+  var fromIdx = groupPlacements.findIndex(function(p) { return p.id === fromId; });
+  var toIdx = groupPlacements.findIndex(function(p) { return p.id === toId; });
   if (fromIdx === -1 || toIdx === -1) return;
 
-  var moved = placements.splice(fromIdx, 1)[0];
-  placements.splice(toIdx, 0, moved);
+  var moved = groupPlacements.splice(fromIdx, 1)[0];
+  groupPlacements.splice(toIdx, 0, moved);
 
-  for (var i = 0; i < placements.length; i++) {
-    if (placements[i].sortOrder !== i) {
-      await pb.collection('flowstate_placements').update(placements[i].id, { sortOrder: i });
+  for (var i = 0; i < groupPlacements.length; i++) {
+    if (groupPlacements[i].sortOrder !== i) {
+      await pb.collection('flowstate_placements').update(groupPlacements[i].id, { sortOrder: i });
     }
   }
   await loadAll();
@@ -2401,7 +2419,14 @@ function renderToday() {
   const priorityOrder = { first: 0, important: 1, whenever: 2 };
   const sortedActive = active.map(function(p) {
     return { p: p, task: data.tasks.find(function(t) { return t.id === p.taskId; }) };
-  }).filter(function(x) { return x.task; }).sort(function(a, b) {
+  }).filter(function(x) { return x.task; });
+
+  var regularCards = sortedActive.filter(function(x) { return x.task.zone !== 'pile'; }).sort(function(a, b) {
+    var sa = a.p.sortOrder || 0, sb = b.p.sortOrder || 0;
+    if (sa !== sb) return sa - sb;
+    return a.p.id.localeCompare(b.p.id);
+  });
+  var pileCards = sortedActive.filter(function(x) { return x.task.zone === 'pile'; }).sort(function(a, b) {
     var sa = a.p.sortOrder || 0, sb = b.p.sortOrder || 0;
     if (sa !== sb) return sa - sb;
     return a.p.id.localeCompare(b.p.id);
@@ -2421,7 +2446,7 @@ function renderToday() {
     html += '<div class="progress-label" style="margin-bottom:16px;padding-left:4px">' + formatTimeEstimate(totalMinutes) + '</div>';
   }
 
-  sortedActive.forEach(function(item) {
+  function renderTodayCard(item) {
     var p = item.p, task = item.task;
     var isActive = activeTaskId === task.id;
     var activeClass = isActive ? ' active-task energy-' + (task.energy || '') + '-active' : '';
@@ -2438,7 +2463,14 @@ function renderToday() {
       ) +
       '<button class="card-action not-today-btn" onclick="notToday(\'' + task.id + '\',\'' + p.id + '\',event)">not today</button>' +
       deleteBtn(task.id) + '</div></div>';
-  });
+  }
+
+  regularCards.forEach(renderTodayCard);
+
+  if (pileCards.length > 0) {
+    html += '<div class="section-label">recurring</div>';
+    pileCards.forEach(renderTodayCard);
+  }
 
   if (sortedActive.length === 0 && done.length === 0) {
     html += '<div class="empty-state">nothing planned for today...<br>add something or check the backlog</div>';
