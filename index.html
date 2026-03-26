@@ -1175,6 +1175,97 @@
       cursor: pointer;
       white-space: nowrap;
     }
+
+    /* === BATCH TRIAGE === */
+    #batch-triage-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: var(--bg);
+      display: none;
+      flex-direction: column;
+    }
+    #batch-triage-panel.open { display: flex; }
+    .batch-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      max-width: 520px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .batch-progress {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .batch-close {
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 12px;
+      background: var(--bg2);
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .batch-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 16px 16px;
+      max-width: 520px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .batch-task-name {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 600;
+      font-size: 20px;
+      color: var(--text);
+      text-align: center;
+      margin-bottom: 24px;
+      line-height: 1.3;
+    }
+    .batch-section-label {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .batch-section { margin-bottom: 16px; }
+    .batch-skip {
+      display: block;
+      margin: 16px auto 0;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 8px 16px;
+    }
+    .batch-skip:active { color: var(--text); }
+    .btn-triage-all {
+      width: 100%;
+      height: 44px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      background: var(--card);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--cta);
+      cursor: pointer;
+      margin-bottom: 16px;
+    }
+    .btn-triage-all:active { background: var(--bg2); }
   </style>
 </head>
 <body>
@@ -1202,6 +1293,7 @@
         <button class="tab-btn" role="tab" aria-selected="false" data-tab="done" onclick="switchTab('done')"><span class="tab-icon">&#9989;</span>done</button>
       </nav>
       <div id="wsid-panel"></div>
+      <div id="batch-triage-panel"></div>
       <div class="sheet-overlay" id="sheet-overlay" onclick="closeSheet()"></div>
       <div class="sheet" id="sheet"><div class="sheet-handle"></div><div id="sheet-content"></div></div>
       <div id="undo-toast" class="undo-toast" style="display:none"></div>
@@ -2414,6 +2506,10 @@ function renderInbox() {
   const tasks = items.filter(function(i) { return i.kind === 'task'; });
   const ideas = items.filter(function(i) { return i.kind === 'idea'; });
 
+  if (tasks.length >= 2) {
+    html += '<button class="btn-triage-all" onclick="openBatchTriage()">triage all (' + tasks.length + ')</button>';
+  }
+
   if (tasks.length === 0 && ideas.length === 0) {
     html += '<div class="empty-state">inbox is clear... nice</div>';
   }
@@ -2477,6 +2573,138 @@ async function inboxQuickSchedule(taskId) {
   await pb.collection('flowstate_placements').create({ taskId: task.id, date: todayStr(), source: 'manual', sortOrder: maxSort + 1 });
   await loadAll();
   render();
+}
+
+// =======================================
+// BATCH TRIAGE
+// =======================================
+let batchTriageState = { tasks: [], index: 0, energy: null, priority: null, time: null };
+
+function openBatchTriage() {
+  var inboxTasks = data.tasks.filter(function(t) { return t.zone === 'inbox' && t.kind === 'task'; });
+  if (inboxTasks.length === 0) return;
+  batchTriageState = { tasks: inboxTasks.map(function(t) { return t.id; }), index: 0, energy: null, priority: null, time: null };
+  renderBatchTriage();
+  document.getElementById('batch-triage-panel').classList.add('open');
+}
+
+function closeBatchTriage() {
+  document.getElementById('batch-triage-panel').classList.remove('open');
+  render();
+}
+
+function batchPick(type, val) {
+  batchTriageState[type] = batchTriageState[type] === val ? null : val;
+  renderBatchTriage();
+}
+
+function renderBatchTriage() {
+  var panel = document.getElementById('batch-triage-panel');
+  var idx = batchTriageState.index;
+  var total = batchTriageState.tasks.length;
+
+  if (idx >= total) {
+    closeBatchTriage();
+    return;
+  }
+
+  var taskId = batchTriageState.tasks[idx];
+  var task = data.tasks.find(function(t) { return t.id === taskId; });
+
+  if (!task || task.zone !== 'inbox') {
+    batchTriageState.index++;
+    renderBatchTriage();
+    return;
+  }
+
+  var html = '<div class="batch-header"><span class="batch-progress">' + (idx + 1) + ' of ' + total + '</span><button class="batch-close" onclick="closeBatchTriage()">\u00d7</button></div>';
+  html += '<div class="batch-content">';
+  html += '<div class="batch-task-name">' + esc(task.name) + '</div>';
+
+  var energyOpts = [
+    { val: 'deep', label: '\uD83D\uDD34 deep work' },
+    { val: 'steady', label: '\uD83D\uDFE1 steady' },
+    { val: 'easy', label: '\uD83D\uDFE2 easy' }
+  ];
+  var priorityOpts = [
+    { val: 'first', label: 'first' },
+    { val: 'important', label: 'important' },
+    { val: 'whenever', label: 'whenever' }
+  ];
+  var timeOpts = [
+    { val: '15m', label: '15m' },
+    { val: '30m', label: '30m' },
+    { val: '1hr', label: '1hr' },
+    { val: '2hr+', label: '2hr+' }
+  ];
+
+  html += '<div class="batch-section"><div class="batch-section-label">energy</div><div class="picker-row">';
+  energyOpts.forEach(function(o) {
+    html += '<button class="picker-chip energy-' + o.val + ' ' + (batchTriageState.energy === o.val ? 'selected' : '') + '" onclick="batchPick(\'energy\',\'' + o.val + '\')">' + o.label + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="batch-section"><div class="batch-section-label">priority</div><div class="picker-row">';
+  priorityOpts.forEach(function(o) {
+    html += '<button class="picker-chip ' + (batchTriageState.priority === o.val ? 'selected' : '') + '" onclick="batchPick(\'priority\',\'' + o.val + '\')">' + o.label + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="batch-section"><div class="batch-section-label">time</div><div class="picker-row">';
+  timeOpts.forEach(function(o) {
+    html += '<button class="picker-chip ' + (batchTriageState.time === o.val ? 'selected' : '') + '" onclick="batchPick(\'time\',\'' + o.val + '\')">' + o.label + '</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div class="sheet-dest-row"><button class="sheet-dest-btn" onclick="batchTriageTo(\'backlog\')">backlog</button><button class="sheet-dest-btn" onclick="batchTriageTo(\'pile\')">pile</button><button class="sheet-dest-btn" onclick="batchTriageTo(\'today\')">today</button></div>';
+  html += '<button class="batch-skip" onclick="batchSkip()">skip</button>';
+  html += '</div>';
+
+  panel.innerHTML = html;
+}
+
+async function batchTriageTo(dest) {
+  var taskId = batchTriageState.tasks[batchTriageState.index];
+  var task = data.tasks.find(function(t) { return t.id === taskId; });
+  if (!task) { batchAdvance(); return; }
+
+  var updates = {
+    energy: batchTriageState.energy || '',
+    priority: batchTriageState.priority || '',
+    time: batchTriageState.time || '',
+    kind: 'task'
+  };
+
+  if (dest === 'today') {
+    updates.zone = 'backlog';
+    await pb.collection('flowstate_tasks').update(task.id, updates);
+    if (!hasActivePlacement(task.id, todayStr())) {
+      var maxSort = getTodayPlacements().reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
+      await pb.collection('flowstate_placements').create({ taskId: task.id, date: todayStr(), source: 'manual', sortOrder: maxSort + 1 });
+    }
+  } else if (dest === 'pile') {
+    updates.zone = 'pile';
+    updates.status = 'available';
+    await pb.collection('flowstate_tasks').update(task.id, updates);
+  } else {
+    updates.zone = 'backlog';
+    await pb.collection('flowstate_tasks').update(task.id, updates);
+  }
+
+  await loadAll();
+  batchAdvance();
+}
+
+function batchSkip() {
+  batchAdvance();
+}
+
+function batchAdvance() {
+  batchTriageState.index++;
+  batchTriageState.energy = null;
+  batchTriageState.priority = null;
+  batchTriageState.time = null;
+  renderBatchTriage();
 }
 
 // =======================================
