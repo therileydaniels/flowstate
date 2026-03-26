@@ -2448,7 +2448,6 @@ async function onTouchDragEnd(e) {
 }
 
 async function reorderPlacements(fromId, toId) {
-  var today = todayStr();
   var allActive = getTodayPlacements().filter(function(p) {
     return !isPlacementComplete(p.id);
   });
@@ -2761,11 +2760,13 @@ function renderBatchTriage() {
   var taskId = batchTriageState.tasks[idx];
   var task = data.tasks.find(function(t) { return t.id === taskId; });
 
-  if (!task || task.zone !== 'inbox') {
+  while (!task || task.zone !== 'inbox') {
     batchTriageState.index++;
-    renderBatchTriage();
-    return;
+    if (batchTriageState.index >= total) { closeBatchTriage(); return; }
+    taskId = batchTriageState.tasks[batchTriageState.index];
+    task = data.tasks.find(function(t) { return t.id === taskId; });
   }
+  idx = batchTriageState.index;
 
   var html = '<div class="batch-header"><span class="batch-progress">' + (idx + 1) + ' of ' + total + '</span><button class="batch-close" onclick="closeBatchTriage()">\u00d7</button></div>';
   html += '<div class="batch-content">';
