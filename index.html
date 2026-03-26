@@ -981,6 +981,39 @@
       margin-top: 8px;
     }
     .btn-new-template:active { background: var(--bg); }
+    .day-picker-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 16px;
+    }
+    .day-picker-btn {
+      flex: 1;
+      min-width: 70px;
+      padding: 8px 4px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .day-picker-btn:active {
+      background: var(--cta);
+      color: white;
+      border-color: var(--cta);
+    }
+    .day-picker-sub {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .day-picker-btn:active .day-picker-sub { color: rgba(255,255,255,0.7); }
     .tpl-edit-section { margin-bottom: 16px; }
     .tpl-edit-label {
       font-family: 'Fredoka', sans-serif;
@@ -1519,6 +1552,23 @@ function dateLabel(dateStr) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
+function getNext7Days() {
+  var days = [];
+  var now = new Date();
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(now);
+    d.setDate(d.getDate() + i);
+    var ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    var label;
+    if (i === 0) { label = 'today'; }
+    else if (i === 1) { label = 'tomorrow'; }
+    else { label = d.toLocaleDateString([], { weekday: 'long' }).toLowerCase(); }
+    var sub = d.toLocaleDateString([], { month: 'short', day: 'numeric' }).toLowerCase();
+    days.push({ date: ds, label: label, sub: sub });
+  }
+  return days;
+}
+
 function localISOString() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' +
@@ -1757,6 +1807,22 @@ async function undoFromToast(placementId) {
   await uncompleteTask(placementId);
 }
 
+function showUndoToast_msg(message) {
+  clearUndoToast();
+  var toast = document.getElementById('undo-toast');
+  if (!toast) return;
+  toast.innerHTML = message;
+  toast.style.display = 'flex';
+  toast.classList.remove('fading');
+  undoToastFadeTimeout = setTimeout(function() {
+    toast.classList.add('fading');
+  }, 2700);
+  undoToastTimeout = setTimeout(function() {
+    toast.style.display = 'none';
+    toast.classList.remove('fading');
+  }, 3000);
+}
+
 // =======================================
 // SHEET MANAGEMENT
 // =======================================
@@ -1971,15 +2037,23 @@ function openTemplatePreview(id) {
     html += '<div class="template-task-item">' + esc(t.name) + ' ' + energyChip(tpl.energy) + ' ' + timeChip(t.time) + '</div>';
   });
   html += '</div>';
-  html += '<div class="sheet-actions"><button class="sheet-btn-secondary" onclick="openTemplateTray()">back</button><button class="sheet-btn-secondary" onclick="openTemplateEdit(\'' + id + '\')">edit</button><button class="sheet-btn-primary" onclick="loadTemplate(\'' + id + '\')">load onto today</button></div>';
+  html += '<div class="sheet-actions"><button class="sheet-btn-secondary" onclick="openTemplateTray()">back</button><button class="sheet-btn-secondary" onclick="openTemplateEdit(\'' + id + '\')">edit</button></div>';
+  var days = getNext7Days();
+  html += '<div class="day-picker-row">';
+  days.forEach(function(d) {
+    html += '<button class="day-picker-btn" onclick="loadTemplate(\'' + id + '\',\'' + d.date + '\')">' + d.label + '<span class="day-picker-sub">' + d.sub + '</span></button>';
+  });
+  html += '</div>';
   openSheet(html);
 }
 
-async function loadTemplate(id) {
+async function loadTemplate(id, targetDate) {
   const tpl = data.templates.find(function(t) { return t.id === id; });
   if (!tpl) return;
-  const today = todayStr();
-  var baseSort = getTodayPlacements().reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
+  var loadDate = targetDate || todayStr();
+  var isToday = loadDate === todayStr();
+  var datePlacements = data.placements.filter(function(p) { return p.date === loadDate; });
+  var baseSort = datePlacements.reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
   for (var i = 0; i < tpl.tasks.length; i++) {
     var t = tpl.tasks[i];
     const created = await pb.collection('flowstate_tasks').create({
@@ -1987,11 +2061,17 @@ async function loadTemplate(id) {
       energy: tpl.energy, priority: 'important', time: t.time,
       status: '', kind: 'task'
     });
-    await pb.collection('flowstate_placements').create({ taskId: created.id, date: today, source: 'template', sortOrder: baseSort + i + 1 });
+    await pb.collection('flowstate_placements').create({ taskId: created.id, date: loadDate, source: 'template', sortOrder: baseSort + i + 1 });
   }
   await loadAll();
   closeSheet();
-  switchTab('today');
+  if (isToday) {
+    switchTab('today');
+  } else {
+    var dayLabel = getNext7Days().find(function(d) { return d.date === loadDate; });
+    showUndoToast_msg('loaded for ' + (dayLabel ? dayLabel.label : loadDate));
+    render();
+  }
 }
 
 const TPL_ICONS = ['\uD83D\uDCEC','\uD83C\uDFAC','\uD83D\uDCCB','\u2702\uFE0F','\uD83D\uDCC5','\uD83D\uDCE4','\uD83D\uDCE6','\uD83C\uDFA8','\uD83D\uDCAA','\uD83E\uDDF9','\uD83D\uDED2','\uD83D\uDCBB','\uD83C\uDFB5','\uD83D\uDCF8','\uD83C\uDFE0','\uD83D\uDCB0'];
