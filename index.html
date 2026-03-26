@@ -313,6 +313,29 @@
       -webkit-user-select: none;
     }
     .drag-handle:active { cursor: grabbing; }
+    .task-card.active-task {
+      border-left: 3px solid var(--cta);
+    }
+    .task-card.active-task.energy-deep-active { border-left-color: #C75450; }
+    .task-card.active-task.energy-steady-active { border-left-color: #C49A2A; }
+    .task-card.active-task.energy-easy-active { border-left-color: #5A9E6F; }
+    .active-timer {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--cta);
+    }
+    .active-timer.energy-deep { color: #C75450; }
+    .active-timer.energy-steady { color: #C49A2A; }
+    .active-timer.energy-easy { color: #5A9E6F; }
+    .card-action.start-btn {
+      color: var(--success);
+      font-size: 16px;
+    }
+    .card-action.stop-btn {
+      color: #C75450;
+      font-size: 14px;
+    }
     .task-card.dragging {
       opacity: 0.4;
       transform: scale(0.96);
@@ -1527,6 +1550,36 @@ let sheetState = {};
 let tplEditState = { id: null, icon: '\uD83D\uDCCB', name: '', energy: 'steady', tasks: [] };
 let wsidState = { energy: null, time: null, pickOne: false, pickIndex: 0, skipped: new Set() };
 let doneFilter = null;
+let activeTaskId = null;
+let activeStartTime = null;
+let activeTimerInterval = null;
+
+function startTask(taskId, e) {
+  if (e) e.stopPropagation();
+  if (activeTaskId === taskId) { stopTask(e); return; }
+  stopTask();
+  activeTaskId = taskId;
+  activeStartTime = Date.now();
+  activeTimerInterval = setInterval(function() { updateActiveTimer(); }, 1000);
+  render();
+}
+
+function stopTask(e) {
+  if (e) e.stopPropagation();
+  activeTaskId = null;
+  activeStartTime = null;
+  if (activeTimerInterval) { clearInterval(activeTimerInterval); activeTimerInterval = null; }
+  render();
+}
+
+function updateActiveTimer() {
+  var el = document.getElementById('active-timer-display');
+  if (!el || !activeStartTime) return;
+  var elapsed = Math.floor((Date.now() - activeStartTime) / 1000);
+  var m = Math.floor(elapsed / 60);
+  var s = elapsed % 60;
+  el.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
 
 // =======================================
 // SHEET MANAGEMENT
@@ -1931,6 +1984,7 @@ function isPlacementComplete(placementId) {
 async function completeTask(taskId, placementId) {
   const task = data.tasks.find(function(t) { return t.id === taskId; });
   if (!task) return;
+  if (activeTaskId === taskId) { stopTask(); }
 
   if (task.zone === 'pile') {
     openNoteSheet(taskId, placementId);
@@ -2161,11 +2215,20 @@ function renderToday() {
 
   sortedActive.forEach(function(item) {
     var p = item.p, task = item.task;
-    html += '<div class="task-card" data-task-id="' + task.id + '" data-placement-id="' + p.id + '" data-zone="' + task.zone + '" draggable="true" ondragstart="onDragStart(event)" ondragend="onDragEnd(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" onclick="cardTap(\'' + task.id + '\',\'' + task.zone + '\',event)">' +
+    var isActive = activeTaskId === task.id;
+    var activeClass = isActive ? ' active-task energy-' + (task.energy || '') + '-active' : '';
+    html += '<div class="task-card' + activeClass + '" data-task-id="' + task.id + '" data-placement-id="' + p.id + '" data-zone="' + task.zone + '" draggable="true" ondragstart="onDragStart(event)" ondragend="onDragEnd(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" onclick="cardTap(\'' + task.id + '\',\'' + task.zone + '\',event)">' +
       '<div class="drag-handle" ontouchstart="onTouchDragStart(event)" ontouchmove="onTouchDragMove(event)" ontouchend="onTouchDragEnd(event)">\u2261</div>' +
       '<div class="card-checkbox energy-' + (task.energy || '') + '" role="checkbox" aria-checked="false" aria-label="complete ' + esc(task.name) + '" onclick="completeTask(\'' + task.id + '\',\'' + p.id + '\');event.stopPropagation()" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){completeTask(\'' + task.id + '\',\'' + p.id + '\');event.preventDefault()}"></div>' +
-      '<div class="card-body"><div class="card-name">' + esc(task.name) + '</div><div class="card-meta">' + energyChip(task.energy) + timeChip(task.time) + (task.zone === 'pile' ? '<span class="chip chip-time">pile</span>' : '') + '</div></div>' +
-      '<div class="card-actions">' + deleteBtn(task.id) + '</div></div>';
+      '<div class="card-body"><div class="card-name">' + esc(task.name) + '</div><div class="card-meta">' + energyChip(task.energy) + timeChip(task.time) + (task.zone === 'pile' ? '<span class="chip chip-time">pile</span>' : '') +
+      (isActive ? ' <span class="active-timer energy-' + (task.energy || '') + '" id="active-timer-display">00:00</span>' : '') +
+      '</div></div>' +
+      '<div class="card-actions">' +
+      (isActive
+        ? '<button class="card-action stop-btn" onclick="stopTask(event)" aria-label="stop task">\u25A0</button>'
+        : '<button class="card-action start-btn" onclick="startTask(\'' + task.id + '\',event)" aria-label="start task">\u25B6</button>'
+      ) +
+      deleteBtn(task.id) + '</div></div>';
   });
 
   if (sortedActive.length === 0 && done.length === 0) {
