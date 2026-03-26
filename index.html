@@ -298,6 +298,29 @@
       transition: transform 0.1s;
     }
     .task-card:active { transform: scale(0.98); }
+    .drag-handle {
+      width: 28px;
+      min-width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 18px;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .task-card.dragging {
+      opacity: 0.4;
+      transform: scale(0.96);
+    }
+    .task-card.drag-over {
+      border-top: 2px solid var(--cta);
+      margin-top: -2px;
+    }
     .task-card.done-card {
       opacity: 0.5;
       cursor: default;
@@ -1181,7 +1204,8 @@ async function loadAll() {
         id: p.id,
         taskId: p.taskId,
         date: p.date,
-        source: p.source
+        source: p.source,
+        sortOrder: p.sortOrder || 0
       };
     });
     data.completions = completions.map(function(c) {
@@ -1588,7 +1612,8 @@ async function triageTo(dest) {
     updates.zone = 'backlog';
     await pb.collection('flowstate_tasks').update(task.id, updates);
     if (!hasActivePlacement(task.id, todayStr())) {
-      await pb.collection('flowstate_placements').create({ taskId: task.id, date: todayStr(), source: 'manual' });
+      var maxSort = getTodayPlacements().reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
+      await pb.collection('flowstate_placements').create({ taskId: task.id, date: todayStr(), source: 'manual', sortOrder: maxSort + 1 });
     }
   } else if (dest === 'pile') {
     updates.zone = 'pile';
@@ -1725,13 +1750,15 @@ async function loadTemplate(id) {
   const tpl = data.templates.find(function(t) { return t.id === id; });
   if (!tpl) return;
   const today = todayStr();
-  for (const t of tpl.tasks) {
+  var baseSort = getTodayPlacements().reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
+  for (var i = 0; i < tpl.tasks.length; i++) {
+    var t = tpl.tasks[i];
     const created = await pb.collection('flowstate_tasks').create({
       name: t.name, zone: 'backlog',
       energy: tpl.energy, priority: 'important', time: t.time,
       status: '', kind: 'task'
     });
-    await pb.collection('flowstate_placements').create({ taskId: created.id, date: today, source: 'template' });
+    await pb.collection('flowstate_placements').create({ taskId: created.id, date: today, source: 'template', sortOrder: baseSort + i + 1 });
   }
   await loadAll();
   closeSheet();
@@ -1996,6 +2023,110 @@ function deleteBtn(taskId) {
 }
 
 // =======================================
+// DRAG-TO-REORDER
+// =======================================
+let dragState = { draggedId: null };
+
+function onDragStart(e) {
+  var card = e.target.closest('.task-card');
+  if (!card) return;
+  dragState.draggedId = card.dataset.placementId;
+  card.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', card.dataset.placementId);
+}
+
+function onDragEnd(e) {
+  var card = e.target.closest('.task-card');
+  if (card) card.classList.remove('dragging');
+  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+  dragState.draggedId = null;
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  var card = e.target.closest('.task-card');
+  if (!card || card.dataset.placementId === dragState.draggedId) return;
+  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+  card.classList.add('drag-over');
+}
+
+async function onDrop(e) {
+  e.preventDefault();
+  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+  var targetCard = e.target.closest('.task-card');
+  if (!targetCard) return;
+  var fromId = dragState.draggedId;
+  var toId = targetCard.dataset.placementId;
+  if (!fromId || !toId || fromId === toId) return;
+  await reorderPlacements(fromId, toId);
+}
+
+// Touch drag support for mobile
+let touchDrag = { el: null, clone: null, startY: 0, placementId: null };
+
+function onTouchDragStart(e) {
+  var card = e.target.closest('.task-card');
+  if (!card) return;
+  e.preventDefault();
+  touchDrag.placementId = card.dataset.placementId;
+  touchDrag.el = card;
+  touchDrag.startY = e.touches[0].clientY;
+  card.classList.add('dragging');
+}
+
+function onTouchDragMove(e) {
+  if (!touchDrag.el) return;
+  e.preventDefault();
+  var touch = e.touches[0];
+  var target = document.elementFromPoint(touch.clientX, touch.clientY);
+  if (!target) return;
+  var card = target.closest('.task-card');
+  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+  if (card && card.dataset.placementId !== touchDrag.placementId) {
+    card.classList.add('drag-over');
+  }
+}
+
+async function onTouchDragEnd(e) {
+  if (!touchDrag.el) return;
+  touchDrag.el.classList.remove('dragging');
+  var overEl = document.querySelector('.drag-over');
+  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+  if (overEl && overEl.dataset.placementId !== touchDrag.placementId) {
+    await reorderPlacements(touchDrag.placementId, overEl.dataset.placementId);
+  }
+  touchDrag = { el: null, clone: null, startY: 0, placementId: null };
+}
+
+async function reorderPlacements(fromId, toId) {
+  var today = todayStr();
+  var placements = getTodayPlacements().filter(function(p) {
+    return !isPlacementComplete(p.id);
+  }).sort(function(a, b) {
+    var sa = a.sortOrder || 0, sb = b.sortOrder || 0;
+    if (sa !== sb) return sa - sb;
+    return a.id.localeCompare(b.id);
+  });
+
+  var fromIdx = placements.findIndex(function(p) { return p.id === fromId; });
+  var toIdx = placements.findIndex(function(p) { return p.id === toId; });
+  if (fromIdx === -1 || toIdx === -1) return;
+
+  var moved = placements.splice(fromIdx, 1)[0];
+  placements.splice(toIdx, 0, moved);
+
+  for (var i = 0; i < placements.length; i++) {
+    if (placements[i].sortOrder !== i) {
+      await pb.collection('flowstate_placements').update(placements[i].id, { sortOrder: i });
+    }
+  }
+  await loadAll();
+  render();
+}
+
+// =======================================
 // TODAY VIEW
 // =======================================
 function renderToday() {
@@ -2023,12 +2154,15 @@ function renderToday() {
   const sortedActive = active.map(function(p) {
     return { p: p, task: data.tasks.find(function(t) { return t.id === p.taskId; }) };
   }).filter(function(x) { return x.task; }).sort(function(a, b) {
-    return (priorityOrder[a.task.priority] != null ? priorityOrder[a.task.priority] : 3) - (priorityOrder[b.task.priority] != null ? priorityOrder[b.task.priority] : 3);
+    var sa = a.p.sortOrder || 0, sb = b.p.sortOrder || 0;
+    if (sa !== sb) return sa - sb;
+    return a.p.id.localeCompare(b.p.id);
   });
 
   sortedActive.forEach(function(item) {
     var p = item.p, task = item.task;
-    html += '<div class="task-card" data-task-id="' + task.id + '" data-zone="' + task.zone + '" onclick="cardTap(\'' + task.id + '\',\'' + task.zone + '\',event)">' +
+    html += '<div class="task-card" data-task-id="' + task.id + '" data-placement-id="' + p.id + '" data-zone="' + task.zone + '" draggable="true" ondragstart="onDragStart(event)" ondragend="onDragEnd(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" onclick="cardTap(\'' + task.id + '\',\'' + task.zone + '\',event)">' +
+      '<div class="drag-handle" ontouchstart="onTouchDragStart(event)" ontouchmove="onTouchDragMove(event)" ontouchend="onTouchDragEnd(event)">\u2261</div>' +
       '<div class="card-checkbox energy-' + (task.energy || '') + '" role="checkbox" aria-checked="false" aria-label="complete ' + esc(task.name) + '" onclick="completeTask(\'' + task.id + '\',\'' + p.id + '\');event.stopPropagation()" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){completeTask(\'' + task.id + '\',\'' + p.id + '\');event.preventDefault()}"></div>' +
       '<div class="card-body"><div class="card-name">' + esc(task.name) + '</div><div class="card-meta">' + energyChip(task.energy) + timeChip(task.time) + (task.zone === 'pile' ? '<span class="chip chip-time">pile</span>' : '') + '</div></div>' +
       '<div class="card-actions">' + deleteBtn(task.id) + '</div></div>';
@@ -2079,7 +2213,8 @@ async function todayQuickAdd() {
     time: parsed.time || '30m',
     status: '', kind: parsed.kind
   });
-  await pb.collection('flowstate_placements').create({ taskId: created.id, date: todayStr(), source: 'manual' });
+  var maxSort = getTodayPlacements().reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
+  await pb.collection('flowstate_placements').create({ taskId: created.id, date: todayStr(), source: 'manual', sortOrder: maxSort + 1 });
   await loadAll();
   input.value = '';
   render();
@@ -2220,7 +2355,8 @@ async function schedulePile(taskId) {
   const today = todayStr();
   if (hasActivePlacement(taskId, today)) return;
   await pb.collection('flowstate_tasks').update(task.id, { status: 'scheduled' });
-  await pb.collection('flowstate_placements').create({ taskId: taskId, date: today, source: 'manual' });
+  var maxSort = getTodayPlacements().reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
+  await pb.collection('flowstate_placements').create({ taskId: taskId, date: today, source: 'manual', sortOrder: maxSort + 1 });
   await loadAll();
   render();
 }
@@ -2310,7 +2446,8 @@ async function backlogAdd() {
 async function scheduleBacklog(taskId) {
   const today = todayStr();
   if (hasActivePlacement(taskId, today)) return;
-  await pb.collection('flowstate_placements').create({ taskId: taskId, date: today, source: 'manual' });
+  var maxSort = getTodayPlacements().reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
+  await pb.collection('flowstate_placements').create({ taskId: taskId, date: today, source: 'manual', sortOrder: maxSort + 1 });
   await loadAll();
   render();
 }
@@ -2506,7 +2643,8 @@ async function wsidLetsGo(taskId) {
     if (task.zone === 'pile') {
       await pb.collection('flowstate_tasks').update(task.id, { status: 'scheduled' });
     }
-    await pb.collection('flowstate_placements').create({ taskId: taskId, date: today, source: 'manual' });
+    var maxSort = getTodayPlacements().reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
+    await pb.collection('flowstate_placements').create({ taskId: taskId, date: today, source: 'manual', sortOrder: maxSort + 1 });
     await loadAll();
   }
   closeWSID();
