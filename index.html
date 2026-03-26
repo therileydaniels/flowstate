@@ -1310,6 +1310,28 @@
       margin-bottom: 16px;
     }
     .btn-triage-all:active { background: var(--bg2); }
+
+    /* === CONFETTI === */
+    #confetti {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .confetti-piece {
+      position: absolute;
+      top: -10px;
+      width: 8px;
+      height: 8px;
+      animation: confetti-fall 2s ease-in forwards;
+    }
+    .confetti-piece:nth-child(odd) { border-radius: 50%; }
+    .confetti-piece:nth-child(3n) { width: 6px; height: 10px; }
+    @keyframes confetti-fall {
+      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
   </style>
 </head>
 <body>
@@ -1835,6 +1857,72 @@ function showUndoToast_msg(message) {
 }
 
 // =======================================
+// CONFETTI
+// =======================================
+var confettiColors = ['#C75450', '#C49A2A', '#5A9E6F', '#5E5BAE', '#A8A6D8'];
+
+function fireConfetti(count) {
+  var existing = document.getElementById('confetti');
+  if (existing) existing.remove();
+  var container = document.createElement('div');
+  container.id = 'confetti';
+  for (var i = 0; i < count; i++) {
+    var piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = (10 + Math.random() * 80) + '%';
+    piece.style.animationDelay = (Math.random() * 0.5) + 's';
+    piece.style.backgroundColor = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+    container.appendChild(piece);
+  }
+  document.getElementById('app').appendChild(container);
+  setTimeout(function() {
+    var el = document.getElementById('confetti');
+    if (el) el.remove();
+  }, 2500);
+}
+
+// =======================================
+// CELEBRATIONS
+// =======================================
+let celebratedMilestones = new Set();
+
+function checkCelebrations(completedTaskEnergy) {
+  var placements = getTodayPlacements();
+  var total = placements.length;
+  if (total === 0) return;
+  var completedCount = placements.filter(function(p) { return isPlacementComplete(p.id); }).length;
+
+  // Deep work completion
+  if (completedTaskEnergy === 'deep') {
+    fireConfetti(25);
+    showUndoToast_msg('deep work done... that\'s the hard stuff');
+    return;
+  }
+
+  // All done
+  if (completedCount === total && !celebratedMilestones.has('alldone')) {
+    celebratedMilestones.add('alldone');
+    fireConfetti(40);
+    showUndoToast_msg('you crushed it today');
+    return;
+  }
+
+  // 50%
+  if (completedCount >= total / 2 && completedCount < total && !celebratedMilestones.has('half')) {
+    celebratedMilestones.add('half');
+    showUndoToast_msg('halfway there... keep going');
+    return;
+  }
+
+  // First task
+  if (completedCount === 1 && !celebratedMilestones.has('first')) {
+    celebratedMilestones.add('first');
+    showUndoToast_msg('off to a good start');
+    return;
+  }
+}
+
+// =======================================
 // SHEET MANAGEMENT
 // =======================================
 function openSheet(html) {
@@ -2292,6 +2380,8 @@ async function completeTask(taskId, placementId) {
   await loadAll();
   render();
   if (placementId) showUndoToast(placementId);
+  var taskEnergy = task.energy;
+  setTimeout(function() { checkCelebrations(taskEnergy); }, 1000);
 }
 
 async function finishCompletion(taskId, placementId, note) {
@@ -2307,6 +2397,8 @@ async function finishCompletion(taskId, placementId, note) {
   }
   await loadAll();
   if (placementId) showUndoToast(placementId);
+  var taskEnergy = task ? task.energy : null;
+  setTimeout(function() { checkCelebrations(taskEnergy); }, 1000);
 }
 
 async function uncompleteTask(placementId) {
