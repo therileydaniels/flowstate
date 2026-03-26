@@ -1135,6 +1135,37 @@
       0%, 100% { opacity: 0.6; }
       50% { opacity: 1; }
     }
+
+    /* === UNDO TOAST === */
+    .undo-toast {
+      position: fixed;
+      bottom: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 320px;
+      padding: 12px 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 16px var(--shadow);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: fadeUp 0.2s ease-out;
+      transition: opacity 0.3s;
+    }
+    .undo-toast.fading { opacity: 0; }
+    .undo-toast-link {
+      color: var(--cta);
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -1164,6 +1195,7 @@
       <div id="wsid-panel"></div>
       <div class="sheet-overlay" id="sheet-overlay" onclick="closeSheet()"></div>
       <div class="sheet" id="sheet"><div class="sheet-handle"></div><div id="sheet-content"></div></div>
+      <div id="undo-toast" class="undo-toast" style="display:none"></div>
     </div>
   </div>
 
@@ -1579,6 +1611,40 @@ function updateActiveTimer() {
   var m = Math.floor(elapsed / 60);
   var s = elapsed % 60;
   el.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+// =======================================
+// UNDO TOAST
+// =======================================
+let undoToastTimeout = null;
+let undoToastFadeTimeout = null;
+
+function showUndoToast(placementId) {
+  clearUndoToast();
+  var toast = document.getElementById('undo-toast');
+  if (!toast) return;
+  toast.innerHTML = 'done! <span class="undo-toast-link" onclick="undoFromToast(\'' + placementId + '\')">undo</span>';
+  toast.style.display = 'flex';
+  toast.classList.remove('fading');
+  undoToastFadeTimeout = setTimeout(function() {
+    toast.classList.add('fading');
+  }, 4700);
+  undoToastTimeout = setTimeout(function() {
+    toast.style.display = 'none';
+    toast.classList.remove('fading');
+  }, 5000);
+}
+
+function clearUndoToast() {
+  if (undoToastTimeout) clearTimeout(undoToastTimeout);
+  if (undoToastFadeTimeout) clearTimeout(undoToastFadeTimeout);
+  var toast = document.getElementById('undo-toast');
+  if (toast) { toast.style.display = 'none'; toast.classList.remove('fading'); }
+}
+
+async function undoFromToast(placementId) {
+  clearUndoToast();
+  await uncompleteTask(placementId);
 }
 
 // =======================================
@@ -2000,6 +2066,7 @@ async function completeTask(taskId, placementId) {
   }
   await loadAll();
   render();
+  if (placementId) showUndoToast(placementId);
 }
 
 async function finishCompletion(taskId, placementId, note) {
@@ -2014,6 +2081,7 @@ async function finishCompletion(taskId, placementId, note) {
     await pb.collection('flowstate_tasks').update(task.id, { zone: 'done' });
   }
   await loadAll();
+  if (placementId) showUndoToast(placementId);
 }
 
 async function uncompleteTask(placementId) {
