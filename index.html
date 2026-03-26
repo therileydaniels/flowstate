@@ -1332,6 +1332,27 @@
       0% { transform: translateY(0) rotate(0deg); opacity: 1; }
       100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
     }
+
+    /* === OFFLINE MODE === */
+    #offline-banner {
+      display: none;
+      text-align: center;
+      padding: 8px 16px;
+      background: var(--bg2);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+    }
+    body.offline .input-bar,
+    body.offline .btn-template,
+    body.offline .card-actions,
+    body.offline .drag-handle,
+    body.offline #wsid-fab,
+    body.offline .btn-triage-all { display: none; }
+    body.offline .card-checkbox { pointer-events: none; opacity: 0.4; }
   </style>
 </head>
 <body>
@@ -1343,6 +1364,7 @@
         <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" id="theme-btn">&#9790;</button>
         <div class="streak-counter" id="streak-counter"></div>
       </header>
+      <div id="offline-banner" onclick="retryConnection()">working offline... tap to retry</div>
       <main>
         <div id="view-today" class="view active"></div>
         <div id="view-inbox" class="view"></div>
@@ -1448,6 +1470,7 @@ async function loadAll() {
         tasks: t.tasks || []
       };
     });
+    saveCache();
   } catch(e) {
     console.error('Failed to load data:', e);
   }
@@ -1919,6 +1942,50 @@ function checkCelebrations(completedTaskEnergy) {
     celebratedMilestones.add('first');
     showUndoToast_msg('off to a good start');
     return;
+  }
+}
+
+// =======================================
+// OFFLINE MODE
+// =======================================
+let isOffline = false;
+
+function saveCache() {
+  try {
+    localStorage.setItem('flowstate_cache', JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadCache() {
+  try {
+    var cached = localStorage.getItem('flowstate_cache');
+    if (cached) {
+      data = JSON.parse(cached);
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+function enterOfflineMode() {
+  isOffline = true;
+  document.body.classList.add('offline');
+  document.getElementById('offline-banner').style.display = 'block';
+}
+
+function exitOfflineMode() {
+  isOffline = false;
+  document.body.classList.remove('offline');
+  document.getElementById('offline-banner').style.display = 'none';
+}
+
+async function retryConnection() {
+  try {
+    await loadAll();
+    exitOfflineMode();
+    render();
+  } catch(e) {
+    // still offline
   }
 }
 
@@ -3366,10 +3433,18 @@ async function init() {
     await loadAll();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app-content').classList.add('loaded');
+    if (isOffline) exitOfflineMode();
     render();
   } catch(e) {
     console.error('Init failed:', e);
-    document.getElementById('loading').textContent = 'hmm something went wrong... check your connection and try again';
+    if (loadCache()) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('app-content').classList.add('loaded');
+      enterOfflineMode();
+      render();
+    } else {
+      document.getElementById('loading').textContent = 'hmm something went wrong... check your connection and try again';
+    }
   }
 }
 
