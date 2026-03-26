@@ -2421,7 +2421,7 @@ function renderInbox() {
   tasks.forEach(function(task) {
     html += '<div class="task-card" onclick="openTriageSheet(\'' + task.id + '\')">' +
       '<div class="card-body"><div class="card-name">' + esc(task.name) + '</div><div class="card-meta">' + energyChip(task.energy) + timeChip(task.time) + '</div></div>' +
-      '<div class="card-actions"><button class="card-action evolve-btn" onclick="openTriageSheet(\'' + task.id + '\');event.stopPropagation()">triage</button>' + deleteBtn(task.id) + '</div></div>';
+      '<div class="card-actions"><button class="card-action schedule-btn" onclick="inboxQuickSchedule(\'' + task.id + '\');event.stopPropagation()">today</button><button class="card-action evolve-btn" onclick="openTriageSheet(\'' + task.id + '\');event.stopPropagation()">triage</button>' + deleteBtn(task.id) + '</div></div>';
   });
 
   ideas.forEach(function(task) {
@@ -2461,6 +2461,22 @@ async function evolveIdea(taskId) {
   await pb.collection('flowstate_tasks').update(task.id, { kind: 'task' });
   await loadAll();
   openTriageSheet(taskId);
+}
+
+async function inboxQuickSchedule(taskId) {
+  var task = data.tasks.find(function(t) { return t.id === taskId; });
+  if (!task) return;
+  await pb.collection('flowstate_tasks').update(task.id, {
+    zone: 'backlog',
+    energy: task.energy || 'steady',
+    priority: task.priority || 'important',
+    time: task.time || '30m',
+    kind: 'task'
+  });
+  var maxSort = getTodayPlacements().reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
+  await pb.collection('flowstate_placements').create({ taskId: task.id, date: todayStr(), source: 'manual', sortOrder: maxSort + 1 });
+  await loadAll();
+  render();
 }
 
 // =======================================
